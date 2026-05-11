@@ -23,4 +23,7 @@ class Tables {
 
   /// OSS 同步队列表
   static const String syncQueue = 'sync_queue';
+
+  /// 应用信息表（存储版本号等）
+  static const String appInfo = 'app_info';
 }

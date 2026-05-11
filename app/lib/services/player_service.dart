@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:logging/logging.dart' as logging;
 
 import '../data/models/song_model.dart';
+
+final _playerLogger = logging.Logger('PlayerService');
 
 /// 播放模式枚举
 enum PlayMode {
@@ -73,15 +77,26 @@ class PlayerService extends GetxService {
 
     // 监听播放状态变化
     _player.playerStateStream.listen((state) {
+      _playerLogger.fine('[状态] playing=${state.playing}, processing=${state.processingState}');
       isPlaying.value = state.playing;
       isLoading.value = state.processingState == ProcessingState.loading ||
           state.processingState == ProcessingState.buffering;
 
       // 播放结束时自动切到下一首
       if (state.processingState == ProcessingState.completed) {
+        _playerLogger.info('[状态] 播放完成');
         _onSongComplete();
       }
     });
+
+    // 监听播放器错误
+    _player.playbackEventStream.listen(
+      (event) {},
+      onError: (Object e, StackTrace st) {
+        _playerLogger.severe('[错误] 播放器异常: $e');
+        _playerLogger.severe('[错误] 堆栈: $st');
+      },
+    );
 
     // 监听播放位置变化
     _player.positionStream.listen((pos) {
@@ -121,15 +136,25 @@ class PlayerService extends GetxService {
     // 加载音频源
     final song = playlist[index];
     final filePath = song.filePath;
-    if (filePath == null) return;
+    if (filePath == null) {
+      _playerLogger.warning('[播放] 文件路径为空: ${song.title}');
+      return;
+    }
 
     isLoading.value = true;
     try {
+      _playerLogger.fine('[播放] 加载文件: $filePath');
+      _playerLogger.fine('[播放] 文件是否存在: ${File(filePath).existsSync()}');
       await _player.setFilePath(filePath);
+      _playerLogger.info('[播放] 加载成功: ${song.title}');
       if (playNow) {
         await _player.play();
+        _playerLogger.info('[播放] 开始播放: ${song.title}');
       }
-    } catch (e) {
+    } catch (e, s) {
+      _playerLogger.severe('[播放] 加载失败: $filePath');
+      _playerLogger.severe('[播放] 错误: $e');
+      _playerLogger.severe('[播放] 堆栈: $s');
       isLoading.value = false;
       rethrow;
     }
@@ -345,12 +370,29 @@ class PlayerService extends GetxService {
     currentSong.value = null;
   }
 
-  /// 格式化时长（毫秒 → "3:45"）
+  /// 格式化时长显示，如 "4:35"
   String formatDuration(int milliseconds) {
     final d = Duration(milliseconds: milliseconds);
     final minutes = d.inMinutes;
     final seconds = d.inSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  /// 测试播放 assets 中的测试音乐
+  Future<void> playTestMusic() async {
+    _playerLogger.info('[测试] 开始播放测试音乐');
+    try {
+      isLoading.value = true;
+      _playerLogger.fine('[测试] 加载 asset:///assets/test/test_music.mp3');
+      await _player.setAsset('assets/test/test_music.mp3');
+      _playerLogger.info('[测试] 加载成功，开始播放');
+      await _player.play();
+    } catch (e, s) {
+      _playerLogger.severe('[测试] 播放失败: $e');
+      _playerLogger.severe('[测试] 堆栈: $s');
+      isLoading.value = false;
+      rethrow;
+    }
   }
 
   /// 当前已播放时间字符串

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../services/player_service.dart';
 import '../../../widgets/mini_player.dart';
 import '../player/player_tab.dart';
 import '../playlist/playlist_tab.dart';
 import '../stats/stats_tab.dart';
 import '../settings/settings_tab.dart';
+import '../../core/tab_controller.dart';
 
 /// 首页 - 底部 4 Tab 导航
 /// 包含：播放器 | 播放列表 | 统计 | 设置
@@ -15,10 +15,10 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> {
   /// 当前 Tab 索引
   int _currentIndex = 0;
 
@@ -30,13 +30,14 @@ class _HomePageState extends State<HomePage> {
     SettingsTab(),
   ];
 
-  /// Tab 标题
-  final List<String> _tabTitles = const [
-    '播放器',
-    '播放列表',
-    '统计',
-    '设置',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // 注册 HomePageController（单例）
+    if (!Get.isRegistered<HomePageController>()) {
+      Get.put(HomePageController());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +49,10 @@ class _HomePageState extends State<HomePage> {
       ),
 
       // 全局迷你播放器（常驻在底部 Tab 栏上方）
-      // MiniPlayer 会自动监听 PlayerService 的播放状态
-      // 有歌曲时自动显示，无歌曲时自动隐藏
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // MiniPlayer：有播放内容时显示
+          // MiniPlayer：在 Tab 0（播放器）时不显示
           const MiniPlayer(),
 
           // 底部 Tab 导航栏
@@ -63,30 +62,25 @@ class _HomePageState extends State<HomePage> {
               setState(() {
                 _currentIndex = index;
               });
+              // 同步到 HomePageController
+              HomePageController.to.switchTab(index);
             },
             items: const [
-              // Tab 1：播放器
               BottomNavigationBarItem(
                 icon: Icon(Icons.play_circle_outline),
                 activeIcon: Icon(Icons.play_circle_filled),
                 label: '播放器',
               ),
-
-              // Tab 2：播放列表
               BottomNavigationBarItem(
                 icon: Icon(Icons.queue_music_outlined),
                 activeIcon: Icon(Icons.queue_music),
                 label: '播放列表',
               ),
-
-              // Tab 3：统计
               BottomNavigationBarItem(
                 icon: Icon(Icons.bar_chart_outlined),
                 activeIcon: Icon(Icons.bar_chart),
                 label: '统计',
               ),
-
-              // Tab 4：设置
               BottomNavigationBarItem(
                 icon: Icon(Icons.settings_outlined),
                 activeIcon: Icon(Icons.settings),

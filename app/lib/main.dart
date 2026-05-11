@@ -4,56 +4,73 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'app/routes/app_pages.dart';
 import 'app/core/theme.dart';
 import 'services/player_service.dart';
 import 'services/local_music_service.dart';
 import 'services/audio_handler_service.dart';
+import 'data/database/database_helper.dart';
 
-/// 全局日志工具
-class AppLogger {
-  static const _tag = '[Vexfy]';
+final _logger = logging.Logger('Vexfy');
 
-  static void d(String tag, String msg) =>
-      print('$_tag$tag $msg');
-
-  static void e(String tag, String msg, [Object? error, StackTrace? stack]) {
-    print('$_tag$tag [ERROR] $msg');
-    if (error != null) print('$_tag$tag 错误: $error');
-    if (stack != null) {
-      final lines = stack.toString().split('\n').take(8).join('\n');
-      print('$_tag$tag 堆栈:\n$lines');
+void _setupLogger() {
+  logging.hierarchicalLoggingEnabled = true;
+  _logger.level = logging.Level.ALL;
+  
+  _logger.onRecord.listen((record) {
+    final levelStr = _levelString(record.level).padRight(7);
+    final time = DateTime.now();
+    final timeStr = '${time.hour.toString().padLeft(2, '0')}:'
+        '${time.minute.toString().padLeft(2, '0')}:'
+        '${time.second.toString().padLeft(2, '0')}.'
+        '${time.millisecond.toString().padLeft(3, '0')}';
+    print('[$timeStr] [Vexfy] $levelStr ${record.message}');
+    if (record.error != null) {
+      print('       错误: ${record.error}');
     }
-  }
+    if (record.stackTrace != null) {
+      print('       堆栈: ${record.stackTrace.toString().split('\n').take(5).join('\n       ')}');
+    }
+  });
+}
 
-  static void i(String tag, String msg) =>
-      print('$_tag$tag $msg');
+String _levelString(logging.Level level) {
+  if (level.value <= 300) return 'DEBUG';
+  if (level.value <= 500) return 'INFO ';
+  if (level.value <= 700) return 'WARN ';
+  return 'ERROR';
 }
 
 /// Vexfy App 入口文件
 void main() async {
+  _setupLogger();
+
   // ===== 全局异常处理（必须是最先设置的）=====
 
   // Flutter widget 层异常（如 build() 里的错误）
   FlutterError.onError = (details) {
-    AppLogger.e('[FlutterError]', 'Widget 异常', details.exception, details.stack);
+    _logger.severe('[FlutterError] Widget 异常: ${details.exception}');
+    if (details.stack != null) {
+      _logger.severe('[FlutterError]', details.stack);
+    }
     FlutterError.presentError(details);
   };
 
   // 原生平台异常（如 platform channel 错误）
   PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.e('[Platform]', '平台异常', error, stack);
+    _logger.severe('[Platform] 平台异常: $error');
+    _logger.severe('[Platform]', stack);
     return true;
   };
 
-  AppLogger.i('[main]', '===== Vexfy App 启动 =====');
+  _logger.info('[main] ===== Vexfy App 启动 =====');
 
   try {
     // 确保 Flutter 绑定初始化完成
     WidgetsFlutterBinding.ensureInitialized();
-    AppLogger.d('[main]', 'Flutter 绑定初始化完成');
+    _logger.fine('[main] Flutter 绑定初始化完成');
 
       // 设置状态栏样式
       SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -68,7 +85,8 @@ void main() async {
       // 启动 App
       runApp(const VexfyApp());
     } catch (e, s) {
-      AppLogger.e('[main]', 'main() 启动异常', e, s);
+      _logger.severe('[main] main() 启动异常: $e');
+      _logger.severe('[main]', s);
       // 显示错误界面，不闪退
       runApp(MaterialApp(
         home: Scaffold(
@@ -82,29 +100,32 @@ void main() async {
 
 /// 初始化全局服务
 Future<void> _initServices() async {
-  AppLogger.d('[main]', '开始初始化全局服务...');
+  _logger.fine('[main] 开始初始化全局服务...');
 
   try {
-    // 为 Linux 和 Windows 初始化 just_audio 媒体后端
-    JustAudioMediaKit.ensureInitialized(
-      linux: true,
-      windows: true,
-    );
-    AppLogger.d('[main]', 'JustAudioMediaKit 初始化完成');
-
     // 注册 PlayerService（播放器核心服务）
     Get.put(PlayerService.instance, permanent: true);
-    AppLogger.d('[main]', 'PlayerService 注册完成');
+    _logger.fine('[main] PlayerService 注册完成');
 
     // 注册 LocalMusicService（本地音乐扫描服务）
     Get.put(LocalMusicService.instance, permanent: true);
-    AppLogger.d('[main]', 'LocalMusicService 注册完成');
+    _logger.fine('[main] LocalMusicService 注册完成');
+
+    // 数据库健康检查
+    final dbHealthy = await DatabaseHelper.instance.healthCheck();
+    if (!dbHealthy) {
+      _logger.severe('[main] 数据库健康检查失败，SQLite 可能无法正常工作');
+    }
+
+    // 执行完整的启动检查
+    await StartupValidator.instance.runAllChecks();
 
     // 启动音频服务（后台播放 + 通知栏）
     await startAudioService();
-    AppLogger.d('[main]', 'AudioService 启动完成');
+    _logger.fine('[main] AudioService 启动完成');
   } catch (e, s) {
-    AppLogger.e('[main]', '_initServices() 异常', e, s);
+    _logger.severe('[main] _initServices() 异常: $e');
+    _logger.severe('[main]', s);
     rethrow;
   }
 }

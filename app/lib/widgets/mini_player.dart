@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../services/player_service.dart';
-import '../app/routes/app_routes.dart';
 import '../app/core/theme.dart';
+import '../app/core/tab_controller.dart';
 
 /// 全局迷你播放器组件
 /// 常驻在底部 Tab 栏上方，有播放内容时自动显示
-/// 点击展开全屏播放页
+/// 在 PlayerTab（第1个Tab）时不显示
+/// 点击切换到 Tab 1（播放器）
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 获取 PlayerService
     final playerService = Get.find<PlayerService>();
 
     // 无播放内容时隐藏
@@ -23,10 +23,21 @@ class MiniPlayer extends StatelessWidget {
         return const SizedBox.shrink();
       }
 
+      // 在 PlayerTab 时不显示迷你播放器
+      // 通过 HomePageController 判断当前 Tab
+      if (Get.isRegistered<HomePageController>()) {
+        final controller = HomePageController.to;
+        if (controller.currentIndex.value == 0) {
+          return const SizedBox.shrink();
+        }
+      }
+
       return GestureDetector(
         onTap: () {
-          // 点击展开全屏播放页
-          Get.toNamed(Routes.player);
+          // 点击切换到 Tab 0（播放器）
+          if (Get.isRegistered<HomePageController>()) {
+            HomePageController.to.switchTab(0);
+          }
         },
         child: Container(
           height: 64,
@@ -77,15 +88,9 @@ class MiniPlayer extends StatelessWidget {
                                   song.coverUrl!,
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) =>
-                                      const Icon(
-                                    Icons.music_note,
-                                    color: Colors.grey,
-                                  ),
+                                      const Icon(Icons.music_note, color: Colors.grey),
                                 )
-                              : const Icon(
-                                  Icons.music_note,
-                                  color: Colors.grey,
-                                ),
+                              : const Icon(Icons.music_note, color: Colors.grey),
                         ),
                       ),
 
@@ -99,20 +104,14 @@ class MiniPlayer extends StatelessWidget {
                           children: [
                             Text(
                               song.title,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
                             Text(
                               song.artist,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFFB3B3B3),
-                              ),
+                              style: const TextStyle(fontSize: 13, color: Color(0xFFB3B3B3)),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -123,27 +122,17 @@ class MiniPlayer extends StatelessWidget {
                       // 播放/暂停按钮
                       Obx(() => IconButton(
                             icon: Icon(
-                              playerService.isPlaying.value
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
+                              playerService.isPlaying.value ? Icons.pause : Icons.play_arrow,
                               size: 32,
                               color: AppTheme.primaryGreen,
                             ),
-                            onPressed: () {
-                              playerService.togglePlayPause();
-                            },
+                            onPressed: () => playerService.togglePlayPause(),
                           )),
 
                       // 下一首按钮
                       IconButton(
-                        icon: const Icon(
-                          Icons.skip_next,
-                          size: 28,
-                          color: Color(0xFFB3B3B3),
-                        ),
-                        onPressed: () {
-                          playerService.next();
-                        },
+                        icon: const Icon(Icons.skip_next, size: 28, color: Color(0xFFB3B3B3)),
+                        onPressed: () => playerService.next(),
                       ),
                     ],
                   ),
