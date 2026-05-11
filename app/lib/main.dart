@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 
 import 'app/routes/app_pages.dart';
 import 'app/core/theme.dart';
@@ -84,6 +85,13 @@ Future<void> _initServices() async {
   AppLogger.d('[main]', '开始初始化全局服务...');
 
   try {
+    // 为 Linux 和 Windows 初始化 just_audio 媒体后端
+    JustAudioMediaKit.ensureInitialized(
+      linux: true,
+      windows: true,
+    );
+    AppLogger.d('[main]', 'JustAudioMediaKit 初始化完成');
+
     // 注册 PlayerService（播放器核心服务）
     Get.put(PlayerService.instance, permanent: true);
     AppLogger.d('[main]', 'PlayerService 注册完成');

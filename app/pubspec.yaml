@@ -23,6 +23,9 @@ dependencies:
   just_audio: ^0.9.40
   audio_service: ^0.18.15
   on_audio_query_pluse: ^3.0.6
+  # 为 Linux 和 Windows 提供 just_audio 支持
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: any
 
   # 工具
   uuid: ^4.4.2
