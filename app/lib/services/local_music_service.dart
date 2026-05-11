@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
@@ -8,10 +9,30 @@ import '../data/database/database_helper.dart';
 import '../data/database/tables.dart';
 import '../data/models/song_model.dart';
 
+/// 全局日志工具
+/// 统一管理日志输出，便于后续切换到文件日志或统计服务
+class AppLogger {
+  static const _tag = '[Vexfy]';
+
+  static void d(String tag, String msg) =>
+      print('$_tag$tag $msg');
+
+  static void e(String tag, String msg, [Object? error, StackTrace? stack]) {
+    print('$_tag$tag [ERROR] $msg');
+    if (error != null) print('$_tag$tag 错误: $error');
+    if (stack != null) print('$_tag$tag 堆栈: ${stack.toString().split('\n').take(5).join('\n')}');
+  }
+
+  static void i(String tag, String msg) =>
+      print('$_tag$tag $msg');
+}
+
 /// 本地音乐扫描服务
 /// 负责扫描设备上的音频文件，解析元数据，存入 SQLite
 /// 支持格式：MP3、AAC、FLAC、WAV、MP4
 class LocalMusicService {
+  static const _tag = '[LocalMusicService]';
+
   // 单例模式
   LocalMusicService._();
   static final LocalMusicService instance = LocalMusicService._();
@@ -22,7 +43,15 @@ class LocalMusicService {
   /// 检查权限并请求
   /// 返回 true 表示有权限
   Future<bool> requestPermission() async {
-    return await _audioQuery.checkAndRequest();
+    try {
+      AppLogger.d(_tag, '请求存储权限...');
+      final result = await _audioQuery.checkAndRequest();
+      AppLogger.d(_tag, '权限结果: $result');
+      return result;
+    } catch (e, s) {
+      AppLogger.e(_tag, 'checkAndRequest 异常', e, s);
+      return false;
+    }
   }
 
   /// 全量扫描本地音乐
@@ -31,47 +60,139 @@ class LocalMusicService {
   Future<int> scanAllMusic({
     void Function(int scanned, int total)? onProgress,
   }) async {
-    // 请求权限
-    final hasPermission = await requestPermission();
-    if (!hasPermission) {
-      throw Exception('缺少存储权限，请到设置中授予权限');
-    }
+    AppLogger.i(_tag, '===== scanAllMusic 开始 =====');
 
-    // 查询所有音频文件
-    final songs = await _audioQuery.querySongs(
-      sortType: oaq.SongSortType.TITLE,
-      orderType: oaq.OrderType.ASC_OR_SMALLER,
-      uriType: oaq.UriType.EXTERNAL,
-      ignoreCase: true,
-    );
+    try {
+      // 请求权限
+      AppLogger.d(_tag, '检查存储权限...');
+      final hasPermission = await requestPermission();
 
-    int count = 0;
-    final total = songs.length;
-
-    for (final song in songs) {
-      // 只处理支持的格式
-      final uri = song.data ?? song.uri ?? '';
-      if (!_isSupportedFormat(uri)) {
-        continue;
+      if (!hasPermission) {
+        AppLogger.i(_tag, '权限不足，切换 Linux 目录扫描');
+        return _scanLinuxDirectory(onProgress: onProgress);
       }
 
-      // 构造 SongModel
-      final songModel = _fromAudioSongModel(song);
+      // Android/iOS：使用 on_audio_query 查询媒体库
+      AppLogger.d(_tag, '使用 on_audio_query 查询媒体库...');
+      final songs = await _audioQuery.querySongs(
+        sortType: oaq.SongSortType.TITLE,
+        orderType: oaq.OrderType.ASC_OR_SMALLER,
+        uriType: oaq.UriType.EXTERNAL,
+        ignoreCase: true,
+      );
 
-      // 存入数据库（更新或插入）
-      await _upsertSong(songModel);
-      count++;
+      AppLogger.d(_tag, 'on_audio_query 返回 ${songs.length} 个文件');
 
-      // 回调进度
-      onProgress?.call(count, total);
+      int count = 0;
+      final total = songs.length;
+
+      for (final song in songs) {
+        try {
+          final uri = song.data ?? song.uri ?? '';
+          if (!_isSupportedFormat(uri)) continue;
+
+          final songModel = _fromAudioSongModel(song);
+          await _upsertSong(songModel);
+          count++;
+          AppLogger.d(_tag, '扫描进度: $count / $total');
+          onProgress?.call(count, total);
+        } catch (e, s) {
+          AppLogger.e(_tag, '处理单个文件异常: ${song.uri ?? song.data}', e, s);
+        }
+      }
+
+      AppLogger.i(_tag, '===== scanAllMusic 完成，共 $count 首 =====');
+      return count;
+    } catch (e, s) {
+      AppLogger.e(_tag, 'scanAllMusic 整体异常，降级到 Linux 扫描', e, s);
+      AppLogger.i(_tag, '切换 Linux 目录扫描');
+      return _scanLinuxDirectory(onProgress: onProgress);
+    }
+  }
+
+  /// Linux 桌面版文件扫描（降级方案）
+  /// 扫描用户音乐目录
+  Future<int> _scanLinuxDirectory({
+    void Function(int scanned, int total)? onProgress,
+  }) async {
+    AppLogger.i(_tag, '===== _scanLinuxDirectory 开始 =====');
+
+    final home = Platform.environment['HOME'] ?? '/home';
+    final musicDir = '$home/Music';
+    final downloadDir = '$home/Downloads';
+    final dirs = [musicDir, downloadDir];
+
+    AppLogger.d(_tag, '扫描目录: $dirs');
+
+    final List<String> audioFiles = [];
+
+    for (final dir in dirs) {
+      try {
+        final directory = Directory(dir);
+        if (await directory.exists()) {
+          AppLogger.d(_tag, '目录存在，开始扫描: $dir');
+          int fileCount = 0;
+          await for (final entity in directory.list(recursive: true)) {
+            if (entity is File && _isSupportedFormat(entity.path)) {
+              audioFiles.add(entity.path);
+              fileCount++;
+            }
+          }
+          AppLogger.d(_tag, '$dir 扫描完成，找到 $fileCount 个音频文件');
+        } else {
+          AppLogger.d(_tag, '目录不存在或无法访问: $dir');
+        }
+      } catch (e, s) {
+        AppLogger.e(_tag, '扫描目录 $dir 异常', e, s);
+      }
     }
 
+    AppLogger.d(_tag, 'Linux 扫描完成，共找到 ${audioFiles.length} 个音频文件');
+
+    int count = 0;
+    final total = audioFiles.length;
+
+    for (final filePath in audioFiles) {
+      try {
+        final songModel = SongModel(
+          id: _generateSongId(filePath),
+          title: _extractFileName(filePath),
+          artist: '未知歌手',
+          album: null,
+          duration: 0,
+          coverUrl: null,
+          source: SongSource.local,
+          filePath: filePath,
+          onlineUrl: null,
+          lyrics: null,
+          isFavorite: false,
+          playCount: 0,
+          createdAt: DateTime.now(),
+        );
+
+        await _upsertSong(songModel);
+        count++;
+        AppLogger.d(_tag, '处理进度: $count / $total');
+        onProgress?.call(count, total);
+      } catch (e, s) {
+        AppLogger.e(_tag, '处理文件 $filePath 失败', e, s);
+      }
+    }
+
+    AppLogger.i(_tag, '===== _scanLinuxDirectory 完成，共 $count 首 =====');
     return count;
+  }
+
+  /// 从文件路径提取文件名（不含扩展名）
+  String _extractFileName(String filePath) {
+    final name = filePath.split('/').last;
+    final dotIndex = name.lastIndexOf('.');
+    if (dotIndex > 0) return name.substring(0, dotIndex);
+    return name;
   }
 
   /// 将 on_audio_query 的 SongModel 转为我们的 SongModel
   SongModel _fromAudioSongModel(oaq.SongModel audioSong) {
-    // audioSong 字段：id, title, artist, album, duration, data, uri, size 等
     final filePath = audioSong.data ?? audioSong.uri ?? '';
 
     return SongModel(
@@ -80,7 +201,7 @@ class LocalMusicService {
       artist: audioSong.artist ?? '未知歌手',
       album: audioSong.album,
       duration: audioSong.duration ?? 0,
-      coverUrl: null, // 封面需要单独查询
+      coverUrl: null,
       source: SongSource.local,
       filePath: filePath,
       onlineUrl: null,
@@ -88,7 +209,7 @@ class LocalMusicService {
       isFavorite: false,
       playCount: 0,
       fileSize: audioSong.size,
-      mimeType: null, // on_audio_query 不提供 mimeType
+      mimeType: null,
       createdAt: DateTime.now(),
     );
   }
@@ -107,10 +228,10 @@ class LocalMusicService {
         lower.endsWith('.flac') ||
         lower.endsWith('.wav') ||
         lower.endsWith('.mp4') ||
-        lower.endsWith('.m4a'); // m4a 也是 AAC 格式
+        lower.endsWith('.m4a');
   }
 
-  /// 插入或更新歌曲（已存在则更新，不存在则插入）
+  /// 插入或更新歌曲
   Future<void> _upsertSong(SongModel song) async {
     final db = await _dbHelper.db;
     await db.insert(
@@ -130,33 +251,7 @@ class LocalMusicService {
     return rows.map((row) => SongModel.fromMap(row)).toList();
   }
 
-  /// 根据 ID 获取歌曲
-  Future<SongModel?> getSongById(String id) async {
-    final db = await _dbHelper.db;
-    final rows = await db.query(
-      Tables.songs,
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return SongModel.fromMap(rows.first);
-  }
-
-  /// 根据文件路径获取歌曲
-  Future<SongModel?> getSongByPath(String filePath) async {
-    final db = await _dbHelper.db;
-    final rows = await db.query(
-      Tables.songs,
-      where: 'file_path = ?',
-      whereArgs: [filePath],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return SongModel.fromMap(rows.first);
-  }
-
-  /// 搜索歌曲（按歌名/歌手）
+  /// 搜索歌曲
   Future<List<SongModel>> searchSongs(String keyword) async {
     final db = await _dbHelper.db;
     final rows = await db.query(
@@ -168,29 +263,9 @@ class LocalMusicService {
     return rows.map((row) => SongModel.fromMap(row)).toList();
   }
 
-  /// 删除歌曲（根据 ID）
+  /// 删除歌曲
   Future<void> deleteSong(String id) async {
     final db = await _dbHelper.db;
-    await db.delete(
-      Tables.songs,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  /// 获取歌曲总数
-  Future<int> getSongCount() async {
-    final db = await _dbHelper.db;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM ${Tables.songs}');
-    return Sqflite.firstIntValue(result) ?? 0;
-  }
-
-  /// 获取总播放时长（秒）
-  Future<int> getTotalDuration() async {
-    final db = await _dbHelper.db;
-    final result = await db.rawQuery(
-        'SELECT SUM(duration) as total FROM ${Tables.songs}');
-    final total = result.first['total'] as int?;
-    return (total ?? 0) ~/ 1000; // 转换为秒
+    await db.delete(Tables.songs, where: 'id = ?', whereArgs: [id]);
   }
 }
