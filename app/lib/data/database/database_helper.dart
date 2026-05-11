@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'tables.dart';
+
+/// 简化日志（避免循环依赖）
+void _log(String tag, String msg) => print('[Vexfy]$tag $msg');
 
 /// 数据库助手 - SQLite 单例管理
 /// 负责数据库初始化、版本管理、迁移
@@ -21,9 +26,21 @@ class DatabaseHelper {
 
   /// 初始化数据库
   Future<Database> _initDatabase() async {
+    // 仅桌面平台（Linux/macOS/Windows）需要 FFI 初始化
+    // Android/iOS 使用原生 SQLite，无需此步
+    if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
+      _log('[DatabaseHelper]', '桌面平台，初始化 sqflite_ffi');
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    } else {
+      _log('[DatabaseHelper]', '移动平台，使用原生 sqflite');
+    }
+
     // 获取应用文档目录
     final documentsDir = await getApplicationDocumentsDirectory();
     final dbPath = join(documentsDir.path, 'vexfy.db');
+
+    _log('[DatabaseHelper]', '数据库路径: $dbPath');
 
     return await openDatabase(
       dbPath,
