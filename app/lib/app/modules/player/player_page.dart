@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../services/player_service.dart';
+import '../../../services/player_service.dart';
 import '../../../app/core/theme.dart';
 
 /// 全屏播放页面

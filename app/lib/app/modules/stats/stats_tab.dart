@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
-import '../../../services/player_service.dart';
 
 /// Tab 3：统计页面
 /// 显示播放统计（播放次数/时长/分类/时段）

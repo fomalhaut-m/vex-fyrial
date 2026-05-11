@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 
 import '../../../services/player_service.dart';
 import '../../routes/app_routes.dart';
-import '../../../app/core/theme.dart';
 
 /// Tab 1：播放器页面
 /// 显示当前播放的封面、歌词、播控按钮

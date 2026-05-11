@@ -71,7 +71,7 @@ class LocalMusicService {
 
   /// 将 on_audio_query 的 SongModel 转为我们的 SongModel
   SongModel _fromAudioSongModel(oaq.SongModel audioSong) {
-    // audioSong 字段：id, title, artist, album, duration, data, uri, size, mimeType 等
+    // audioSong 字段：id, title, artist, album, duration, data, uri, size 等
     final filePath = audioSong.data ?? audioSong.uri ?? '';
 
     return SongModel(
@@ -88,7 +88,7 @@ class LocalMusicService {
       isFavorite: false,
       playCount: 0,
       fileSize: audioSong.size,
-      mimeType: audioSong.mimeType,
+      mimeType: null, // on_audio_query 不提供 mimeType
       createdAt: DateTime.now(),
     );
   }

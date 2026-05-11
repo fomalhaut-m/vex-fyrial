@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_service/audio_service.dart';
 
 import '../data/models/song_model.dart';
 
@@ -25,8 +24,11 @@ class PlayerService extends GetxService {
   static final PlayerService instance = PlayerService._();
 
   /// just_audio 的 AudioPlayer 实例
-  /// 公开给 AudioHandler 访问（同一 lib/ 目录下可访问 private 成员）
+  /// 公开给 AudioHandler 访问
   late final AudioPlayer _player;
+
+  /// 对外暴露 player 实例（供 AudioHandler 访问）
+  AudioPlayer get player => _player;
 
   /// 播放队列
   final RxList<SongModel> playlist = <SongModel>[].obs;
