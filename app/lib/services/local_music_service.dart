@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
-import 'package:on_audio_query/on_audio_query.dart' as oaq;
+import 'package:on_audio_query_pluse/on_audio_query.dart' as oaq;
 import 'package:sqflite/sqflite.dart';
 
 import '../data/database/database_helper.dart';

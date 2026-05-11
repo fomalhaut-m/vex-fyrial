@@ -5,7 +5,7 @@ version: 1.0.0+1
 
 environment:
   sdk: ^3.11.5
-
+dart-native-assets: false
 dependencies:
   flutter:
     sdk: flutter
@@ -22,7 +22,7 @@ dependencies:
   # 音频播放
   just_audio: ^0.9.40
   audio_service: ^0.18.15
-  on_audio_query: ^2.9.0
+  on_audio_query: 3.0.0-beta.0
 
   # 工具
   uuid: ^4.4.2

@@ -22,208 +22,228 @@ class PlayerTab extends StatelessWidget {
           final isPlaying = playerService.isPlaying.value;
           final isLoading = playerService.isLoading.value;
 
-          return Column(
-            children: [
-              // 上方空余空间
-              const SizedBox(height: 40),
+          return LayoutBuilder(
+            // 响应式布局，适配不同屏幕
+            builder: (context, constraints) {
+              // 根据可用高度动态调整封面大小
+              final coverSize = (constraints.maxHeight * 0.35).clamp(180.0, 300.0);
 
-              // 封面图片
-              // 播放时旋转动画，暂停时停止
-              GestureDetector(
-                onTap: () {
-                  // 点击封面：跳转到全屏播放页
-                  Get.toNamed(Routes.player);
-                },
-                child: Container(
-                  width: 280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+              return SingleChildScrollView(
+                // 小屏幕时可滚动，防止溢出
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Column(
+                    children: [
+                      // 上方空余空间
+                      SizedBox(height: constraints.maxHeight * 0.05),
+
+                      // 封面图片
+                      GestureDetector(
+                        onTap: () {
+                          Get.toNamed(Routes.player);
+                        },
+                        child: Container(
+                          width: coverSize,
+                          height: coverSize,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: song?.coverUrl != null
+                                ? Image.network(
+                                    song!.coverUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildDefaultCover(),
+                                  )
+                                : _buildDefaultCover(),
+                          ),
+                        ),
                       ),
+
+                      SizedBox(height: constraints.maxHeight * 0.03),
+
+                      // 歌曲名称
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          song?.title ?? '未选择歌曲',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // 歌手名
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          song?.artist ?? '请选择一首歌曲播放',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFFB3B3B3),
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      // 进度条 + 时间
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          children: [
+                            SizedBox(height: constraints.maxHeight * 0.03),
+                            // 进度条
+                            Obx(() {
+                              final pos = playerService.position.value;
+                              final dur = playerService.duration.value;
+                              final percent = dur > 0 ? pos / dur : 0.0;
+
+                              return SliderTheme(
+                                data: Theme.of(context).sliderTheme.copyWith(
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 6,
+                                      ),
+                                      trackHeight: 4,
+                                    ),
+                                child: Slider(
+                                  value: percent.clamp(0.0, 1.0),
+                                  onChanged: (value) {
+                                    playerService.seekToPercent(value);
+                                  },
+                                ),
+                              );
+                            }),
+
+                            // 时间显示
+                            Obx(() => Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      playerService.currentTimeString,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFFB3B3B3),
+                                      ),
+                                    ),
+                                    Text(
+                                      playerService.totalTimeString,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFFB3B3B3),
+                                      ),
+                                    ),
+                                  ],
+                                )),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 控制栏：上一首 | 播放/暂停 | 下一首
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // 随机播放按钮
+                            Obx(() => IconButton(
+                                  icon: Icon(
+                                    Icons.shuffle,
+                                    color: playerService.isShuffle.value
+                                        ? const Color(0xFF1DB954)
+                                        : const Color(0xFFB3B3B3),
+                                  ),
+                                  onPressed: () {
+                                    playerService.toggleShuffle();
+                                  },
+                                )),
+
+                            // 上一首
+                            IconButton(
+                              icon: const Icon(Icons.skip_previous, size: 40),
+                              onPressed: () {
+                                playerService.previous();
+                              },
+                            ),
+
+                            // 播放/暂停按钮
+                            isLoading
+                                ? const SizedBox(
+                                    width: 64,
+                                    height: 64,
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF1DB954),
+                                      strokeWidth: 3,
+                                    ),
+                                  )
+                                : IconButton(
+                                    icon: Icon(
+                                      isPlaying
+                                          ? Icons.pause_circle_filled
+                                          : Icons.play_circle_filled,
+                                      size: 64,
+                                      color: const Color(0xFF1DB954),
+                                    ),
+                                    onPressed: () {
+                                      playerService.togglePlayPause();
+                                    },
+                                  ),
+
+                            // 下一首
+                            IconButton(
+                              icon: const Icon(Icons.skip_next, size: 40),
+                              onPressed: () {
+                                playerService.next();
+                              },
+                            ),
+
+                            // 循环模式按钮
+                            Obx(() => IconButton(
+                                  icon: Icon(
+                                    _getRepeatIcon(playerService.playMode.value),
+                                    color: playerService.playMode.value !=
+                                            PlayMode.sequential
+                                        ? const Color(0xFF1DB954)
+                                        : const Color(0xFFB3B3B3),
+                                  ),
+                                  onPressed: () {
+                                    playerService.cycleRepeatMode();
+                                  },
+                                )),
+                          ],
+                        ),
+                      ),
+
+                      // 底部留白，防止最后一屏内容贴边
+                      SizedBox(height: constraints.maxHeight * 0.05),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: song?.coverUrl != null
-                        ? Image.network(
-                            song!.coverUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildDefaultCover(),
-                          )
-                        : _buildDefaultCover(),
-                  ),
                 ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 歌曲名称
-              Text(
-                song?.title ?? '未选择歌曲',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-
-              const SizedBox(height: 8),
-
-              // 歌手名
-              Text(
-                song?.artist ?? '请选择一首歌曲播放',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFFB3B3B3),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-
-              const Spacer(),
-
-              // 进度条 + 时间
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    // 进度条
-                    Obx(() {
-                      final pos = playerService.position.value;
-                      final dur = playerService.duration.value;
-                      final percent =
-                          dur > 0 ? pos / dur : 0.0;
-
-                      return SliderTheme(
-                        data: Theme.of(context).sliderTheme.copyWith(
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6,
-                              ),
-                              trackHeight: 4,
-                            ),
-                        child: Slider(
-                          value: percent.clamp(0.0, 1.0),
-                          onChanged: (value) {
-                            playerService.seekToPercent(value);
-                          },
-                        ),
-                      );
-                    }),
-
-                    // 时间显示
-                    Obx(() => Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              playerService.currentTimeString,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFB3B3B3),
-                              ),
-                            ),
-                            Text(
-                              playerService.totalTimeString,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFB3B3B3),
-                              ),
-                            ),
-                          ],
-                        )),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 控制栏：上一首 | 播放/暂停 | 下一首
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // 随机播放按钮
-                    Obx(() => IconButton(
-                          icon: Icon(
-                            Icons.shuffle,
-                            color: playerService.isShuffle.value
-                                ? const Color(0xFF1DB954)
-                                : const Color(0xFFB3B3B3),
-                          ),
-                          onPressed: () {
-                            playerService.toggleShuffle();
-                          },
-                        )),
-
-                    // 上一首
-                    IconButton(
-                      icon: const Icon(Icons.skip_previous, size: 40),
-                      onPressed: () {
-                        playerService.previous();
-                      },
-                    ),
-
-                    // 播放/暂停按钮
-                    isLoading
-                        ? const SizedBox(
-                            width: 64,
-                            height: 64,
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF1DB954),
-                              strokeWidth: 3,
-                            ),
-                          )
-                        : IconButton(
-                            icon: Icon(
-                              isPlaying
-                                  ? Icons.pause_circle_filled
-                                  : Icons.play_circle_filled,
-                              size: 64,
-                              color: const Color(0xFF1DB954),
-                            ),
-                            onPressed: () {
-                              playerService.togglePlayPause();
-                            },
-                          ),
-
-                    // 下一首
-                    IconButton(
-                      icon: const Icon(Icons.skip_next, size: 40),
-                      onPressed: () {
-                        playerService.next();
-                      },
-                    ),
-
-                    // 循环模式按钮
-                    Obx(() => IconButton(
-                          icon: Icon(
-                            _getRepeatIcon(playerService.playMode.value),
-                            color: playerService.playMode.value !=
-                                    PlayMode.sequential
-                                ? const Color(0xFF1DB954)
-                                : const Color(0xFFB3B3B3),
-                          ),
-                          onPressed: () {
-                            playerService.cycleRepeatMode();
-                          },
-                        )),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-            ],
+              );
+            },
           );
         }),
       ),
