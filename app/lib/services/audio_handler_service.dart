@@ -1,17 +1,25 @@
 import 'dart:async';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart' as logging;
 
 import '../data/models/song_model.dart';
-import 'player_service.dart';
+import '../providers/player_provider.dart';
 
 /// 音频处理服务（AudioHandler）
 /// 实现后台播放、通知栏控制、锁屏控制
+/// 支持 just_audio_mpv（Linux 桌面）
+/// 所有操作都有完善的日志和异常兜底
 class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
-  final AudioPlayer _player;
-  final PlayerService _playerService;
+  static const _tag = '[VexfyAudioHandler]';
+  static final _logger = logging.Logger(_tag)..level = logging.Level.ALL;
+
+  /// just_audio player 实例
+  AudioPlayer? _player;
+
+  /// PlayerNotifier 引用
+  PlayerNotifier? _playerNotifier;
 
   /// 当前的歌曲信息
   MediaItem? _currentMediaItem;
@@ -20,38 +28,52 @@ class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
   StreamSubscription? _playingSubscription;
   StreamSubscription? _positionSubscription;
   StreamSubscription? _durationSubscription;
-  StreamSubscription? _currentIndexSubscription;
+  StreamSubscription? _songSubscription;
 
-  VexfyAudioHandler(this._player, this._playerService) {
-    // 监听 just_audio 的播放状态，转换为 audio_service 格式
-    _playingSubscription = _player.playerStateStream.listen((state) {
-      playbackState.add(playbackState.value.copyWith(
-        playing: state.playing,
-        processingState: _mapProcessingState(state.processingState),
-      ));
-    });
+  VexfyAudioHandler() {
+    _logger.info('[初始化] VexfyAudioHandler 创建');
+  }
 
-    // 监听播放位置
-    _positionSubscription = _player.positionStream.listen((pos) {
-      if (_player.playing) {
-        seek(pos);
-      }
-    });
+  /// 关联 PlayerNotifier
+  void attachPlayerNotifier(PlayerNotifier notifier) {
+    _logger.info('[关联] attachPlayerNotifier()');
 
-    // 监听总时长变化
-    _durationSubscription = _player.durationStream.listen((dur) {
-      if (dur != null && _currentMediaItem != null) {
-        final updated = _currentMediaItem!.copyWith(duration: dur);
-        _currentMediaItem = updated;
-        mediaItem.add(updated);
-      }
-    });
+    _playerNotifier = notifier;
+    _player = notifier.player;
+    _logger.info('[关联] PlayerNotifier 关联成功');
+  }
 
-    // 监听当前歌曲变化
-    _currentIndexSubscription =
-        _playerService.currentSong.listen((song) async {
+  /// PlayerNotifier 状态变化回调
+  void _onPlayerStateChanged() {
+    try {
+      if (_playerNotifier == null) return;
+
+      final state = _playerNotifier!.state;
+      updateCurrentSong(state.currentSong);
+    } catch (e, s) {
+      _logger.severe('[状态] _onPlayerStateChanged 异常', e, s);
+    }
+  }
+
+  /// 更新当前歌曲（通知栏显示）
+  void updateCurrentSong(SongModel? song) {
+    _logger.fine('[更新] updateCurrentSong() song=${song?.title}');
+
+    try {
       if (song != null) {
-        await _updateMediaItem(song);
+        _currentMediaItem = MediaItem(
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          album: song.album ?? '',
+          duration: Duration(milliseconds: song.duration),
+          artUri: song.coverUrl != null ? Uri.parse(song.coverUrl!) : null,
+          extras: {
+            'file_path': song.filePath ?? '',
+          },
+        );
+        mediaItem.add(_currentMediaItem!);
+        _logger.fine('[更新] 通知栏更新成功: ${song.title}');
       } else {
         _currentMediaItem = null;
         mediaItem.add(MediaItem(
@@ -61,180 +83,299 @@ class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
           duration: Duration.zero,
         ));
       }
-    });
+    } catch (e, s) {
+      _logger.severe('[更新] updateCurrentSong 异常', e, s);
+    }
   }
 
   /// 将 just_audio 的 ProcessingState 映射为 audio_service 的 AudioProcessingState
   AudioProcessingState _mapProcessingState(ProcessingState state) {
-    switch (state) {
-      case ProcessingState.idle:
-        return AudioProcessingState.idle;
-      case ProcessingState.loading:
-        return AudioProcessingState.loading;
-      case ProcessingState.buffering:
-        return AudioProcessingState.buffering;
-      case ProcessingState.ready:
-        return AudioProcessingState.ready;
-      case ProcessingState.completed:
-        return AudioProcessingState.completed;
+    try {
+      switch (state) {
+        case ProcessingState.idle:
+          return AudioProcessingState.idle;
+        case ProcessingState.loading:
+          return AudioProcessingState.loading;
+        case ProcessingState.buffering:
+          return AudioProcessingState.buffering;
+        case ProcessingState.ready:
+          return AudioProcessingState.ready;
+        case ProcessingState.completed:
+          return AudioProcessingState.completed;
+      }
+    } catch (e, s) {
+      _logger.severe('[映射] _mapProcessingState 异常', e, s);
+      return AudioProcessingState.idle;
     }
-  }
-
-  /// 更新 MediaItem（通知栏显示的歌曲信息）
-  Future<void> _updateMediaItem(SongModel song) async {
-    _currentMediaItem = MediaItem(
-      id: song.id,
-      title: song.title,
-      artist: song.artist,
-      album: song.album ?? '',
-      duration: Duration(milliseconds: song.duration),
-      artUri: song.coverUrl != null ? Uri.parse(song.coverUrl!) : null,
-      extras: {
-        'file_path': song.filePath ?? '',
-      },
-    );
-    mediaItem.add(_currentMediaItem!);
   }
 
   @override
   Future<void> play() async {
-    await _player.play();
+    _logger.fine('[控制] play()');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.play();
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] play 异常', e, s);
+    }
   }
 
   @override
   Future<void> pause() async {
-    await _player.pause();
+    _logger.fine('[控制] pause()');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.pause();
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] pause 异常', e, s);
+    }
   }
 
   @override
   Future<void> stop() async {
-    await _player.stop();
-    playbackState.add(PlaybackState());
+    _logger.fine('[控制] stop()');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.stop();
+      }
+      playbackState.add(PlaybackState());
+    } catch (e, s) {
+      _logger.severe('[控制] stop 异常', e, s);
+    }
   }
 
   @override
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    _logger.fine('[控制] seek() position=$position');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.seekTo(position.inMilliseconds);
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] seek 异常', e, s);
+    }
   }
 
   @override
   Future<void> skipToNext() async {
-    await _playerService.next();
+    _logger.fine('[控制] skipToNext()');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.next();
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] skipToNext 异常', e, s);
+    }
   }
 
   @override
   Future<void> skipToPrevious() async {
-    await _playerService.previous();
+    _logger.fine('[控制] skipToPrevious()');
+
+    try {
+      if (_playerNotifier != null) {
+        await _playerNotifier!.previous();
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] skipToPrevious 异常', e, s);
+    }
   }
 
   @override
   Future<void> skipToQueueItem(int index) async {
-    if (index >= 0 && index < _playerService.playlist.length) {
-      final song = _playerService.playlist[index];
-      await _playerService.playSong(song);
+    _logger.fine('[控制] skipToQueueItem() index=$index');
+
+    try {
+      if (_playerNotifier != null) {
+        final playlist = _playerNotifier!.state.playlist;
+        if (index >= 0 && index < playlist.length) {
+          await _playerNotifier!.playSong(playlist[index]);
+        }
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] skipToQueueItem 异常', e, s);
     }
   }
 
   @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
-    final rawPath = mediaItem.extras?['file_path'];
-    final filePath = rawPath != null ? '$rawPath' : '';
-    final dur = mediaItem.duration ?? Duration.zero;
+    _logger.fine('[控制] addQueueItem() title=${mediaItem.title}');
 
-    final song = SongModel(
-      id: mediaItem.id,
-      title: mediaItem.title,
-      artist: mediaItem.artist ?? '',
-      album: mediaItem.album ?? '',
-      duration: dur.inMilliseconds,
-      coverUrl: mediaItem.artUri?.toString(),
-      source: SongSource.local,
-      filePath: filePath,
-    );
-    _playerService.addToPlaylist(song);
+    try {
+      if (_playerNotifier != null) {
+        final rawPath = mediaItem.extras?['file_path'];
+        final filePath = rawPath != null ? '$rawPath' : '';
+        final dur = mediaItem.duration ?? Duration.zero;
+
+        final song = SongModel(
+          id: mediaItem.id,
+          title: mediaItem.title,
+          artist: mediaItem.artist ?? '',
+          album: mediaItem.album ?? '',
+          duration: dur.inMilliseconds,
+          coverUrl: mediaItem.artUri?.toString(),
+          source: SongSource.local,
+          filePath: filePath,
+        );
+        _playerNotifier!.addToPlaylist(song);
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] addQueueItem 异常', e, s);
+    }
   }
 
   @override
   Future<void> removeQueueItem(MediaItem mediaItem) async {
-    _playerService.removeFromPlaylist(mediaItem.id);
+    _logger.fine('[控制] removeQueueItem() id=${mediaItem.id}');
+
+    try {
+      if (_playerNotifier != null) {
+        _playerNotifier!.removeFromPlaylist(mediaItem.id);
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] removeQueueItem 异常', e, s);
+    }
   }
 
   @override
   Future<void> updateQueue(List<MediaItem> queue) async {
-    final songs = <SongModel>[];
-    for (final item in queue) {
-      final rawPath = item.extras?['file_path'];
-      final filePath = rawPath != null ? '$rawPath' : '';
-      final dur = item.duration ?? Duration.zero;
+    _logger.fine('[控制] updateQueue() count=${queue.length}');
 
-      songs.add(SongModel(
-        id: item.id,
-        title: item.title,
-        artist: item.artist ?? '',
-        album: item.album ?? '',
-        duration: dur.inMilliseconds,
-        coverUrl: item.artUri?.toString(),
-        source: SongSource.local,
-        filePath: filePath,
-      ));
+    try {
+      if (_playerNotifier != null) {
+        final songs = <SongModel>[];
+        for (final item in queue) {
+          final rawPath = item.extras?['file_path'];
+          final filePath = rawPath != null ? '$rawPath' : '';
+          final dur = item.duration ?? Duration.zero;
+
+          songs.add(SongModel(
+            id: item.id,
+            title: item.title,
+            artist: item.artist ?? '',
+            album: item.album ?? '',
+            duration: dur.inMilliseconds,
+            coverUrl: item.artUri?.toString(),
+            source: SongSource.local,
+            filePath: filePath,
+          ));
+        }
+        await _playerNotifier!.setPlaylist(songs);
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] updateQueue 异常', e, s);
     }
-    await _playerService.setPlaylist(songs);
   }
 
   @override
-  Future<void> setShuffleMode(AudioServiceShuffleMode mode) async {
-    if (mode == AudioServiceShuffleMode.all) {
-      _playerService.toggleShuffle();
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    _logger.fine('[控制] setShuffleMode() shuffleMode=$shuffleMode');
+
+    try {
+      if (_playerNotifier != null && shuffleMode == AudioServiceShuffleMode.all) {
+        _playerNotifier!.toggleShuffle();
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] setShuffleMode 异常', e, s);
     }
   }
 
   @override
-  Future<void> setRepeatMode(AudioServiceRepeatMode mode) async {
-    switch (mode) {
-      case AudioServiceRepeatMode.none:
-        _playerService.playMode.value = PlayMode.sequential;
-        break;
-      case AudioServiceRepeatMode.one:
-        _playerService.playMode.value = PlayMode.singleLoop;
-        break;
-      case AudioServiceRepeatMode.all:
-        _playerService.playMode.value = PlayMode.listLoop;
-        break;
-      case AudioServiceRepeatMode.group:
-        break;
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    _logger.fine('[控制] setRepeatMode() repeatMode=$repeatMode');
+
+    try {
+      if (_playerNotifier != null) {
+        switch (repeatMode) {
+          case AudioServiceRepeatMode.none:
+            _playerNotifier!.setPlayMode(PlayMode.sequential);
+            break;
+          case AudioServiceRepeatMode.one:
+            _playerNotifier!.setPlayMode(PlayMode.singleLoop);
+            break;
+          case AudioServiceRepeatMode.all:
+            _playerNotifier!.setPlayMode(PlayMode.listLoop);
+            break;
+          case AudioServiceRepeatMode.group:
+            break;
+        }
+      }
+    } catch (e, s) {
+      _logger.severe('[控制] setRepeatMode 异常', e, s);
     }
   }
 
   @override
   Future<void> onTaskRemoved() async {
-    await stop();
-    await _player.dispose();
+    _logger.info('[控制] onTaskRemoved()');
+
+    try {
+      await stop();
+      _player?.dispose();
+    } catch (e, s) {
+      _logger.severe('[控制] onTaskRemoved 异常', e, s);
+    }
   }
 
+  /// 释放资源
   void dispose() {
-    _playingSubscription?.cancel();
-    _positionSubscription?.cancel();
-    _durationSubscription?.cancel();
-    _currentIndexSubscription?.cancel();
+    _logger.info('[释放] dispose()');
+
+    try {
+      _playingSubscription?.cancel();
+      _positionSubscription?.cancel();
+      _durationSubscription?.cancel();
+      _songSubscription?.cancel();
+    } catch (e, s) {
+      _logger.severe('[释放] dispose 异常', e, s);
+    }
   }
 }
 
+/// 全局 AudioHandler 实例（单例）
+VexfyAudioHandler? _audioHandler;
+
+/// 获取全局 AudioHandler
+VexfyAudioHandler get audioHandler {
+  _audioHandler ??= VexfyAudioHandler();
+  return _audioHandler!;
+}
+
 /// 启动音频服务（后台播放）
-Future<VexfyAudioHandler> startAudioService() async {
-  return await AudioService.init(
-    builder: () {
-      final playerService = PlayerService.instance;
-      return VexfyAudioHandler(
-        playerService.player,
-        playerService,
-      );
-    },
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.vexfy.vexfy.audio',
-      androidNotificationChannelName: 'Vexfy 音乐播放',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      notificationColor: Color(0xFF1DB954),
-    ),
-  );
+/// 失败不影响主流程
+Future<VexfyAudioHandler?> startAudioService() async {
+  final logger = logging.Logger('[Vexfy AudioService]')..level = logging.Level.INFO;
+  logger.info('启动音频服务...');
+
+  try {
+    final handler = await AudioService.init(
+      builder: () => audioHandler,
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.vexfy.vexfy.audio',
+        androidNotificationChannelName: 'Vexfy 音乐播放',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        notificationColor: Color(0xFF1DB954),
+      ),
+    );
+
+    logger.info('音频服务启动成功');
+    return handler;
+  } catch (e, s) {
+    logger.warning('音频服务启动失败: $e');
+    logger.severe('堆栈', e, s);
+    return null;
+  }
+}
+
+/// 带降级的音频服务启动
+Future<VexfyAudioHandler?> startAudioServiceWithFallback() async {
+  return await startAudioService();
 }

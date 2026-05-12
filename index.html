@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vexrune | 全平台 Flutter 开发者</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            color: #7f8c8d;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #2980b9;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: color 0.3s;
+        }
+
+        .nav a:hover {
+            color: #1abc9c;
+        }
+
+        .section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #1abc9c;
+            display: inline-block;
+        }
+
+        .project-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .project-card {
+            padding: 1.5rem;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            transition: transform 0.3s;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .project-card h3 {
+            color: #2980b9;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-card p {
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .project-card a {
+            color: #1abc9c;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .wiki-box {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+
+        .wiki-box h2 {
+            margin-bottom: 1rem;
+            border: none;
+            color: white;
+        }
+
+        .wiki-box a {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.8rem 2rem;
+            background: white;
+            color: #764ba2;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s;
+        }
+
+        .wiki-box a:hover {
+            transform: scale(1.05);
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #7f8c8d;
+            margin-top: 3rem;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Vexrune</h1>
+            <p>专注 Flutter 全平台开发 | 音视频 | 状态管理 | 本地数据</p>
+            <p>域名：vexrune.top</p>
+        </header>
+
+        <div class="nav">
+            <a href="#about">关于我</a>
+            <a href="#projects">GitHub 项目</a>
+            <a href="#wiki">知识库</a>
+            <a href="https://github.com/fomalhaut-m" target="_blank">GitHub</a>
+        </div>
+
+        <section id="about" class="section">
+            <h2>关于我</h2>
+            <p>全平台应用开发者，主攻 Flutter 跨平台开发（Android / iOS / Windows / macOS / Linux）</p>
+            <p>精通技术栈：GetX、Dio、drift、just_audio、SQLite、音视频播放、本地数据库</p>
+            <p>持续分享 Flutter 开发、架构设计、全平台部署实战经验</p>
+        </section>
+
+        <section id="projects" class="section">
+            <h2>GitHub 公开项目</h2>
+            <div class="project-list">
+                <!-- 自动展示你的 GitHub 仓库 -->
+                <div class="project-card">
+                    <h3>Flutter 全平台音乐播放器</h3>
+                    <p>基于 GetX + just_audio + drift 开发的跨平台音乐播放器</p>
+                    <a href="https://github.com/fomalhaut-m" target="_blank">查看项目 →</a>
+                </div>
+                <div class="project-card">
+                    <h3>GetX 架构实战</h3>
+                    <p>Flutter GetX 路由、状态管理、依赖注入完整教程</p>
+                    <a href="https://github.com/fomalhaut-m" target="_blank">查看项目 →</a>
+                </div>
+                <div class="project-card">
+                    <h3>Flutter 全平台工具集</h3>
+                    <p>网络请求、本地存储、数据库、音视频整合工具</p>
+                    <a href="https://github.com/fomalhaut-m" target="_blank">查看项目 →</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="wiki" class="wiki-box">
+            <h2>知识库 Wiki</h2>
+            <p>Flutter 学习笔记、架构文档、技术教程、问题解决方案</p>
+            <a href="https://wiki.vexrune.top" target="_blank">进入 wiki.vexrune.top</a>
+        </section>
+
+        <footer>
+            <p>&copy; 2025 Vexrune | vexrune.top | 基于纯 HTML 构建</p>
+        </footer>
+    </div>
+</body>
+</html>

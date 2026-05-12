@@ -1,43 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../services/player_service.dart';
-import '../../../services/local_music_service.dart';
+import '../../../providers/player_provider.dart';
+import '../../../providers/local_music_provider.dart';
 import '../../../data/models/song_model.dart';
 
 /// Tab 2：播放列表页面
 /// 显示本地音乐列表，支持搜索、筛选
-class PlaylistTab extends StatefulWidget {
+class PlaylistTab extends ConsumerStatefulWidget {
   const PlaylistTab({super.key});
 
   @override
-  State<PlaylistTab> createState() => _PlaylistTabState();
+  ConsumerState<PlaylistTab> createState() => _PlaylistTabState();
 }
 
-class _PlaylistTabState extends State<PlaylistTab>
+class _PlaylistTabState extends ConsumerState<PlaylistTab>
     with SingleTickerProviderStateMixin {
   /// Tab 控制器
   late final TabController _tabController;
 
-  /// 本地音乐服务
-  final LocalMusicService _localMusicService = LocalMusicService.instance;
-
-  /// 播放器服务
-  PlayerService get _playerService => Get.find<PlayerService>();
-
-  /// 歌曲列表
-  final RxList<SongModel> _songs = <SongModel>[].obs;
-
-  /// 是否正在扫描
-  final RxBool _isScanning = false.obs;
-
-  /// 扫描进度
-  final RxInt _scanProgress = 0.obs;
-  final RxInt _scanTotal = 0.obs;
-
   /// 搜索关键词
   final TextEditingController _searchController = TextEditingController();
-  final RxString _searchKeyword = ''.obs;
+  String _searchKeyword = '';
 
   /// 当前子 Tab 索引
   int _subTabIndex = 0; // 0=全部 1=最近播放 2=收藏
@@ -51,7 +35,11 @@ class _PlaylistTabState extends State<PlaylistTab>
         _subTabIndex = _tabController.index;
       });
     });
-    _loadSongs();
+
+    // 初始加载歌曲
+    Future.microtask(() {
+      ref.read(localMusicProvider.notifier).loadAllSongs();
+    });
   }
 
   @override
@@ -61,69 +49,47 @@ class _PlaylistTabState extends State<PlaylistTab>
     super.dispose();
   }
 
-  /// 加载本地歌曲列表
-  Future<void> _loadSongs() async {
-    final loaded = await _localMusicService.loadAllSongs();
-    _songs.assignAll(loaded);
-  }
-
   /// 扫描本地音乐
   Future<void> _scanMusic() async {
-    if (_isScanning.value) return;
-
-    _isScanning.value = true;
-    _scanProgress.value = 0;
-    _scanTotal.value = 0;
+    final notifier = ref.read(localMusicProvider.notifier);
+    if (notifier.state.isScanning) return;
 
     try {
-      final count = await _localMusicService.scanAllMusic(
-        onProgress: (scanned, total) {
-          _scanProgress.value = scanned;
-          _scanTotal.value = total;
-        },
-      );
-
-      // 重新加载歌曲列表
-      await _loadSongs();
-
-      Get.snackbar(
-        '扫描完成',
-        '共扫描到 $count 首歌曲',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
+      final count = await notifier.scanAllMusic();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('共扫描到 $count 首歌曲'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      Get.snackbar(
-        '扫描失败',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      _isScanning.value = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('扫描失败: $e', style: const TextStyle(color: Colors.white)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   /// 播放歌曲
-  void _playSong(SongModel song) {
-    // 设置播放队列并播放
-    _playerService.setPlaylist(_songs.toList(), startIndex: _songs.indexOf(song));
-  }
-
-  /// 搜索歌曲
-  List<SongModel> _filterSongs() {
-    final keyword = _searchKeyword.value.toLowerCase();
-    if (keyword.isEmpty) return _songs.toList();
-
-    return _songs.where((song) {
-      return song.title.toLowerCase().contains(keyword) ||
-          song.artist.toLowerCase().contains(keyword);
-    }).toList();
+  void _playSong(SongModel song, List<SongModel> allSongs) {
+    final startIndex = allSongs.indexOf(song);
+    ref.read(playerProvider.notifier).setPlaylist(allSongs, startIndex: startIndex);
   }
 
   @override
   Widget build(BuildContext context) {
+    final localMusicState = ref.watch(localMusicProvider);
+    final songs = localMusicState.songs;
+    final isScanning = localMusicState.isScanning;
+    final scanProgress = localMusicState.scanProgress;
+    final scanTotal = localMusicState.scanTotal;
+
     return Scaffold(
       // 页面标题
       appBar: AppBar(
@@ -138,7 +104,7 @@ class _PlaylistTabState extends State<PlaylistTab>
           ),
 
           // 扫描按钮
-          Obx(() => _isScanning.value
+          isScanning
               ? const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: SizedBox(
@@ -150,7 +116,7 @@ class _PlaylistTabState extends State<PlaylistTab>
               : IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _scanMusic,
-                )),
+                ),
         ],
 
         // 子 Tab 筛选
@@ -170,45 +136,11 @@ class _PlaylistTabState extends State<PlaylistTab>
       body: Column(
         children: [
           // 统计栏：歌曲数量 + 总时长
-          _buildStatsBar(),
+          _buildStatsBar(songs),
 
           // 歌曲列表
           Expanded(
-            child: Obx(() {
-              // 扫描进度显示
-              if (_isScanning.value && _scanTotal.value > 0) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(
-                        color: Color(0xFF1DB954),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '已扫描 ${_scanProgress.value} / ${_scanTotal.value} 首',
-                        style: const TextStyle(color: Color(0xFFB3B3B3)),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              // 歌曲列表
-              final filtered = _filterSongs();
-
-              if (filtered.isEmpty) {
-                return _buildEmptyState();
-              }
-
-              return ListView.builder(
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final song = filtered[index];
-                  return _buildSongTile(song);
-                },
-              );
-            }),
+            child: _buildBody(songs, isScanning, scanProgress, scanTotal),
           ),
         ],
       ),
@@ -216,25 +148,76 @@ class _PlaylistTabState extends State<PlaylistTab>
   }
 
   /// 统计栏
-  Widget _buildStatsBar() {
+  Widget _buildStatsBar(List<SongModel> songs) {
+    final count = songs.length;
+    final totalMs = songs.fold<int>(0, (sum, s) => sum + s.duration);
+    final hours = totalMs ~/ 3600000;
+    final minutes = (totalMs % 3600000) ~/ 60000;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: Colors.grey[100],
-      child: Obx(() {
-        final count = _songs.length;
-        final totalMs = _songs.fold<int>(0, (sum, s) => sum + s.duration);
-        final hours = totalMs ~/ 3600000;
-        final minutes = (totalMs % 3600000) ~/ 60000;
-
-        return Text(
-          '共 $count 首  ·  总时长 ${hours > 0 ? "${hours}小时" : ""}$minutes分钟',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFFB3B3B3),
-          ),
-        );
-      }),
+      child: Text(
+        '共 $count 首  ·  总时长 ${hours > 0 ? "${hours}小时" : ""}$minutes分钟',
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFFB3B3B3),
+        ),
+      ),
     );
+  }
+
+  /// 主体内容
+  Widget _buildBody(
+    List<SongModel> songs,
+    bool isScanning,
+    int scanProgress,
+    int scanTotal,
+  ) {
+    // 扫描进度显示
+    if (isScanning && scanTotal > 0) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(
+              color: Color(0xFF1DB954),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '已扫描 $scanProgress / $scanTotal 首',
+              style: const TextStyle(color: Color(0xFFB3B3B3)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 过滤歌曲
+    final filtered = _filterSongs(songs);
+
+    if (filtered.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final song = filtered[index];
+        return _buildSongTile(song, songs);
+      },
+    );
+  }
+
+  /// 过滤歌曲
+  List<SongModel> _filterSongs(List<SongModel> songs) {
+    if (_searchKeyword.isEmpty) return songs;
+
+    final keyword = _searchKeyword.toLowerCase();
+    return songs.where((song) {
+      return song.title.toLowerCase().contains(keyword) ||
+          song.artist.toLowerCase().contains(keyword);
+    }).toList();
   }
 
   /// 空状态
@@ -281,7 +264,7 @@ class _PlaylistTabState extends State<PlaylistTab>
   }
 
   /// 歌曲列表项
-  Widget _buildSongTile(SongModel song) {
+  Widget _buildSongTile(SongModel song, List<SongModel> allSongs) {
     return ListTile(
       // 左侧音乐图标
       leading: Container(
@@ -334,7 +317,7 @@ class _PlaylistTabState extends State<PlaylistTab>
       ),
 
       // 点击播放
-      onTap: () => _playSong(song),
+      onTap: () => _playSong(song, allSongs),
     );
   }
 }

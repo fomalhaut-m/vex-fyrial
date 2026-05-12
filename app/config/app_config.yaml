@@ -1,0 +1,7 @@
+logging:
+  level: debug  # debug, info, warning, error
+  enableConsole: true
+  enableFile: false
+  filePath: logs/vexfy.log
+  maxFileSize: 10485760  # 10MB
+  maxBackups: 5

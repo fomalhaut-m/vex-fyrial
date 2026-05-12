@@ -1,45 +1,126 @@
+# 项目名称：应用唯一标识
 name: vexfy
-description: "Vexfy - 个人音乐播放器，流畅、稳定、低内存"
-publish_to: 'none'
+# 项目描述
+description: Vexfy - 个人音乐播放器，流畅、稳定、低内存
+# 版本号：主版本.次版本.修订号+构建号
 version: 1.0.0+1
 
+# Dart SDK 版本约束
 environment:
-  sdk: ^3.11.5
-dart-native-assets: false
+  sdk: '>=3.0.0 <4.0.0'
+
+# 运行依赖（打包进APP）
 dependencies:
   flutter:
     sdk: flutter
 
+  # ====================== 音乐播放核心 ======================
+  # 音频播放核心引擎：播放/暂停/进度/切歌/倍速
+  # 文档：https://pub.dev/packages/just_audio
+  just_audio: ^0.9.40
+  # Linux 桌面端 mpv 后端支持
+  # 文档：https://pub.dev/packages/just_audio_mpv
+  just_audio_mpv: ^0.1.7
+  # 后台播放 + 通知栏控制 + 耳机线控
+  # 文档：https://pub.dev/packages/audio_service
+  audio_service: ^0.18.15
+
+  # ====================== 状态管理 ======================
+  # Riverpod 状态管理（管理播放状态、歌单、设置）
+  # 文档：https://pub.dev/packages/flutter_riverpod
+  flutter_riverpod: ^2.5.0
+  # Riverpod 注解支持
+  # 文档：https://pub.dev/packages/riverpod_annotation
+  riverpod_annotation: ^2.3.0
+
+  # ====================== 路由管理 ======================
+  # 声明式路由，页面跳转管理
+  # 文档：https://pub.dev/packages/go_router
+  go_router: ^14.8.0
+
+  # ====================== 本地持久化存储 ======================
+  # 轻量键值存储：音量、主题、播放模式
+  # 文档：https://pub.dev/packages/shared_preferences
+  shared_preferences: ^2.5.2
+  # SQLite 本地数据库：歌单、收藏、播放历史
+  # 文档：https://pub.dev/packages/sqflite
+  sqflite: ^2.4.1
+  # 跨平台通用数据库FFI（桌面Windows/Linux/macOS必备）
+  # 文档：https://pub.dev/packages/sqflite_common_ffi
+  sqflite_common_ffi: ^2.4.0+3
+  # 获取系统存储路径
+  # 文档：https://pub.dev/packages/path_provider
+  path_provider: ^2.1.5
+
+  # ====================== 权限 + 文件扫描（核心） ======================
+  # 动态权限申请：存储、音频、后台权限
+  # 文档：https://pub.dev/packages/permission_handler
+  permission_handler: ^11.3.1
+  # 文件选择/扫描，获取本地音频文件
+  # 文档：https://pub.dev/packages/file_picker
+  file_picker: ^8.3.0
+
+  # ====================== 网络检测 ======================
+  # 检测网络状态：WiFi/移动网络/离线
+  # 文档：https://pub.dev/packages/connectivity_plus
+  connectivity_plus: ^6.1.0
+
+  # ====================== 工具类 ======================
+  # 网络请求（下载歌词、在线音乐）
+  # 文档：https://pub.dev/packages/dio
+  dio: ^5.8.0+1
+  # 时间格式化、国际化（歌曲时长）
+  # 文档：https://pub.dev/packages/intl
+  intl: ^0.19.0
+  # 生成唯一ID（歌曲/歌单标识）
+  # 文档：https://pub.dev/packages/uuid
+  uuid: ^4.5.1
+  # 加密工具
+  # 文档：https://pub.dev/packages/crypto
+  crypto: ^3.0.3
+  # 文件路径解析、拼接
+  # 文档：https://pub.dev/packages/path
+  path: ^1.9.1
+
+  # ====================== UI图标 ======================
+  # iOS 风格图标
+  # 文档：https://pub.dev/packages/cupertino_icons
   cupertino_icons: ^1.0.8
 
-  # 状态管理 + 路由
-  get: ^4.6.6
-
-  # 本地数据库
-  sqflite: ^2.3.3
-  path_provider: ^2.1.3
-
-  # 音频播放
-  just_audio: ^0.9.40
-  # 添加下面这行，支持 Linux/Windows/macOS 桌面端
-  just_audio_mpv: ^0.1.7
-  audio_service: ^0.18.15
-  on_audio_query_pluse: ^3.0.6
-
-  # 工具
-  uuid: ^4.4.2
-  crypto: ^3.0.3
-  path: ^1.9.1
+  # ====================== 日志记录 ======================
+  # 日志记录工具
+  # 文档：https://pub.dev/packages/logging
   logging: ^1.3.0
+  
+  # ====================== 分析工具 ======================
+  # 分析工具：用户行为、应用性能
+  # 文档：https://pub.dev/packages/talker
+  talker: ^5.1.17
+  # Flutter 分析工具：用户行为、应用性能
+  # 文档：https://pub.dev/packages/talker_flutter
+  talker_flutter: ^5.1.16
 
+# 开发依赖（仅开发/构建阶段使用，不打包进APP）
 dev_dependencies:
+  # Flutter 单元测试
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
-  sqflite_common_ffi: ^2.4.0+3
+  # 代码规范与静态检查
+  # 文档：https://pub.dev/packages/flutter_lints
+  flutter_lints: ^4.0.0
+  # 代码自动生成工具
+  # 文档：https://pub.dev/packages/build_runner
+  build_runner: ^2.4.13
+  # Riverpod 自动生成代码
+  # 文档：https://pub.dev/packages/riverpod_generator
+  riverpod_generator: ^2.4.3
 
+# Flutter 配置
 flutter:
+  # 启用 Material Design 图标与组件
   uses-material-design: true
 
+  # 静态资源目录
   assets:
-    - assets/test/
+    - assets/test/   # 测试音频/资源
+    - config/        # 配置文件

@@ -1,149 +1,126 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../services/player_service.dart';
-import '../../../app/core/theme.dart';
+import '../../../providers/player_provider.dart';
+import '../../../providers/tab_index_provider.dart';
+import '../../core/theme.dart';
 
 /// 全屏播放页面
 /// 从 Tab 1 的"点击封面"或"点击 MiniPlayer"跳转
 /// 显示封面大图 + 歌词视图 + 完整播控栏
-class PlayerPage extends StatelessWidget {
+class PlayerPage extends ConsumerWidget {
   const PlayerPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final playerService = Get.find<PlayerService>();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(playerProvider);
 
     return Scaffold(
       // 背景色
       backgroundColor: Colors.white,
 
       // 页面内容
-      body: Obx(() {
-        final song = playerService.currentSong.value;
-        final isPlaying = playerService.isPlaying.value;
-        final isLoading = playerService.isLoading.value;
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 顶部操作栏
+            _buildTopBar(context),
 
-        return SafeArea(
-          child: Column(
-            children: [
-              // 顶部操作栏
-              _buildTopBar(context),
-
-              // 中间区域：封面或歌词
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    // 切换封面/歌词模式（暂不实现歌词模式）
-                    Get.back();
-                  },
-                  onVerticalDragEnd: (details) {
-                    // 下滑关闭页面
-                    if (details.primaryVelocity! > 300) {
-                      Get.back();
-                    }
-                  },
-                  child: _buildCoverView(song),
-                ),
+            // 中间区域：封面或歌词
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  // 点击关闭页面
+                  context.pop();
+                },
+                onVerticalDragEnd: (details) {
+                  // 下滑关闭页面
+                  if (details.primaryVelocity! > 300) {
+                    context.pop();
+                  }
+                },
+                child: _buildCoverView(playerState.currentSong),
               ),
+            ),
 
-              // 歌曲名称 + 歌手
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    Text(
-                      song?.title ?? '未选择歌曲',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            // 歌曲名称 + 歌手
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  Text(
+                    playerState.currentSong?.title ?? '未选择歌曲',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      song?.artist ?? '未知歌手',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: AppTheme.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    playerState.currentSong?.artist ?? '未知歌手',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondary,
                     ),
-                  ],
-                ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
+            ),
 
-              const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-              // 进度条
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    Obx(() {
-                      final pos = playerService.position.value;
-                      final dur = playerService.duration.value;
-                      final percent = dur > 0 ? pos / dur : 0.0;
+            // 进度条
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  _buildProgressSlider(ref, playerState),
 
-                      return SliderTheme(
-                        data: Theme.of(context).sliderTheme.copyWith(
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6,
-                              ),
-                              trackHeight: 4,
-                            ),
-                        child: Slider(
-                          value: percent.clamp(0.0, 1.0),
-                          onChanged: (value) {
-                            playerService.seekToPercent(value);
-                          },
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        playerState.currentTimeString,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
                         ),
-                      );
-                    }),
-
-                    Obx(() => Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              playerService.currentTimeString,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              playerService.totalTimeString,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        )),
-                  ],
-                ),
+                      ),
+                      Text(
+                        playerState.totalTimeString,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
 
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-              // 控制栏
-              _buildControlBar(playerService, isPlaying, isLoading),
+            // 控制栏
+            _buildControlBar(ref, playerState),
 
-              // 底部提示手势条
-              const SizedBox(height: 8),
-              _buildGestureHint(),
+            // 底部提示手势条
+            const SizedBox(height: 8),
+            _buildGestureHint(),
 
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      }),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
     );
   }
 
@@ -157,7 +134,7 @@ class PlayerPage extends StatelessWidget {
           // 返回按钮
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down, size: 32),
-            onPressed: () => Get.back(),
+            onPressed: () => context.pop(),
           ),
 
           // 更多按钮（暂不实现）
@@ -168,6 +145,22 @@ class PlayerPage extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  /// 进度条 Slider
+  Widget _buildProgressSlider(WidgetRef ref, VexfyPlayerState state) {
+    return SliderTheme(
+      data: const SliderThemeData(
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+        trackHeight: 4,
+      ),
+      child: Slider(
+        value: state.progressPercent.clamp(0.0, 1.0),
+        onChanged: (value) {
+          ref.read(playerProvider.notifier).seekToPercent(value);
+        },
       ),
     );
   }
@@ -222,32 +215,33 @@ class PlayerPage extends StatelessWidget {
   }
 
   /// 控制栏
-  Widget _buildControlBar(
-      PlayerService playerService, bool isPlaying, bool isLoading) {
+  Widget _buildControlBar(WidgetRef ref, VexfyPlayerState state) {
+    final notifier = ref.read(playerProvider.notifier);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // 随机播放
-          Obx(() => IconButton(
-                icon: Icon(
-                  Icons.shuffle,
-                  color: playerService.isShuffle.value
-                      ? AppTheme.primaryGreen
-                      : AppTheme.textSecondary,
-                ),
-                onPressed: () => playerService.toggleShuffle(),
-              )),
+          IconButton(
+            icon: Icon(
+              Icons.shuffle,
+              color: state.isShuffle
+                  ? AppTheme.primaryGreen
+                  : AppTheme.textSecondary,
+            ),
+            onPressed: () => notifier.toggleShuffle(),
+          ),
 
           // 上一首
           IconButton(
             icon: const Icon(Icons.skip_previous, size: 44),
-            onPressed: () => playerService.previous(),
+            onPressed: () => notifier.previous(),
           ),
 
           // 播放/暂停
-          isLoading
+          state.isLoading
               ? const SizedBox(
                   width: 64,
                   height: 64,
@@ -258,31 +252,31 @@ class PlayerPage extends StatelessWidget {
                 )
               : IconButton(
                   icon: Icon(
-                    isPlaying
+                    state.isPlaying
                         ? Icons.pause_circle_filled
                         : Icons.play_circle_filled,
                     size: 64,
                     color: AppTheme.primaryGreen,
                   ),
-                  onPressed: () => playerService.togglePlayPause(),
+                  onPressed: () => notifier.togglePlayPause(),
                 ),
 
           // 下一首
           IconButton(
             icon: const Icon(Icons.skip_next, size: 44),
-            onPressed: () => playerService.next(),
+            onPressed: () => notifier.next(),
           ),
 
           // 循环模式
-          Obx(() => IconButton(
-                icon: Icon(
-                  _getRepeatIcon(playerService.playMode.value),
-                  color: playerService.playMode.value != PlayMode.sequential
-                      ? AppTheme.primaryGreen
-                      : AppTheme.textSecondary,
-                ),
-                onPressed: () => playerService.cycleRepeatMode(),
-              )),
+          IconButton(
+            icon: Icon(
+              _getRepeatIcon(state.playMode),
+              color: state.playMode != PlayMode.sequential
+                  ? AppTheme.primaryGreen
+                  : AppTheme.textSecondary,
+            ),
+            onPressed: () => notifier.cycleRepeatMode(),
+          ),
         ],
       ),
     );

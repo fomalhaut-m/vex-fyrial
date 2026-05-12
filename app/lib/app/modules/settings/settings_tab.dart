@@ -175,6 +175,7 @@ class SettingsTab extends StatelessWidget {
         value: value,
         onChanged: onChanged,
         activeColor: const Color(0xFF1DB954),
+        activeThumbColor: const Color(0xFF1DB954),
       ),
     );
   }

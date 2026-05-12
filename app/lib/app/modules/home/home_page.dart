@@ -1,51 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../providers/tab_index_provider.dart';
 import '../../../widgets/mini_player.dart';
 import '../player/player_tab.dart';
 import '../playlist/playlist_tab.dart';
 import '../stats/stats_tab.dart';
 import '../settings/settings_tab.dart';
-import '../../core/tab_controller.dart';
 
 /// 首页 - 底部 4 Tab 导航
 /// 包含：播放器 | 播放列表 | 统计 | 设置
 /// 全局 MiniPlayer 常驻在 Tab 栏上方
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => HomePageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tabState = ref.watch(tabIndexProvider);
 
-class HomePageState extends State<HomePage> {
-  /// 当前 Tab 索引
-  int _currentIndex = 0;
+    // Tab 列表
+    const List<Widget> tabs = [
+      PlayerTab(),
+      PlaylistTab(),
+      StatsTab(),
+      SettingsTab(),
+    ];
 
-  /// Tab 列表
-  final List<Widget> _tabs = const [
-    PlayerTab(),
-    PlaylistTab(),
-    StatsTab(),
-    SettingsTab(),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // 注册 HomePageController（单例）
-    if (!Get.isRegistered<HomePageController>()) {
-      Get.put(HomePageController());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       // Tab 内容区域
       body: IndexedStack(
-        index: _currentIndex,
-        children: _tabs,
+        index: tabState.currentIndex,
+        children: tabs,
       ),
 
       // 全局迷你播放器（常驻在底部 Tab 栏上方）
@@ -57,13 +42,9 @@ class HomePageState extends State<HomePage> {
 
           // 底部 Tab 导航栏
           BottomNavigationBar(
-            currentIndex: _currentIndex,
+            currentIndex: tabState.currentIndex,
             onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-              // 同步到 HomePageController
-              HomePageController.to.switchTab(index);
+              ref.read(tabIndexProvider.notifier).switchTab(index);
             },
             items: const [
               BottomNavigationBarItem(
