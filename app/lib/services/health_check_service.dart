@@ -7,10 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:sqflite/sqflite.dart';
 import 'package:logging/logging.dart' as logging;
-
-import '../data/database/database_helper.dart';
 
 /// 健康检测结果
 class HealthCheckResult {
@@ -131,54 +128,14 @@ class HealthCheckService {
 
   Future<void> _checkDatabase() async {
     _logger.fine('[健康检测-数据库] 开始检测...');
-
-    try {
-      final dbHelper = DatabaseHelper.instance;
-      final db = await dbHelper.db;
-      final now = DateTime.now().toIso8601String();
-
-      // 写入测试
-      const testKey = 'health_check_db';
-      await db.insert(
-        'app_info',
-        {'key': testKey, 'value': '1.0.0', 'updated_at': now},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      // 读取验证
-      final result = await db.query(
-        'app_info',
-        where: 'key = ?',
-        whereArgs: [testKey],
-      );
-
-      // 清理测试数据
-      await db.delete('app_info', where: 'key = ?', whereArgs: [testKey]);
-
-      if (result.isEmpty) {
-        _results.add(const HealthCheckResult(
-          feature: '数据库',
-          isHealthy: false,
-          message: '异常：无法读取刚写入的数据',
-        ));
-        _logger.severe('[健康检测-数据库] ❌ 异常：无法读取');
-      } else {
-        _results.add(HealthCheckResult(
-          feature: '数据库',
-          isHealthy: true,
-          message: dbHelper.isMemoryMode ? '正常（内存模式）' : '正常',
-        ));
-        _logger.info('[健康检测-数据库] ✅ 正常${dbHelper.isMemoryMode ? '（内存模式）' : ''}');
-      }
-    } catch (e, s) {
-      _results.add(HealthCheckResult(
-        feature: '数据库',
-        isHealthy: false,
-        message: '异常：${e.toString()}',
-        error: s.toString(),
-      ));
-      _logger.severe('[健康检测-数据库] ❌ 异常', e, s);
-    }
+    
+    // 注意：数据库已废弃，跳过检测
+    _results.add(const HealthCheckResult(
+      feature: '数据库',
+      isHealthy: true,
+      message: '已废弃（待后续实现）',
+    ));
+    _logger.info('[健康检测-数据库] ⚠️ 已废弃（待后续实现）');
   }
 
   // ========== 2. 文件读写检测 ==========
@@ -188,15 +145,15 @@ class HealthCheckService {
 
     try {
       final documentsDir = await getApplicationDocumentsDirectory();
-      final testFilePath = path.join(documentsDir.path, '.vexfy_health_check');
+      final testFilePath = path.join(documentsDir.path, '.Fyrial_health_check');
 
       // 写入测试
-      await File(testFilePath).writeAsString('Vexfy Health Check\n');
+      await File(testFilePath).writeAsString('Fyrial Health Check\n');
       _logger.fine('[健康检测-文件读写] 写入成功');
 
       // 读取验证
       final content = await File(testFilePath).readAsString();
-      if (!content.contains('Vexfy Health Check')) {
+      if (!content.contains('Fyrial Health Check')) {
         throw Exception('文件内容验证失败');
       }
       _logger.fine('[健康检测-文件读写] 读取成功');

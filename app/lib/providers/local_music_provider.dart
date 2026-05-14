@@ -1,14 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
 
-import '../../data/database/database_helper.dart';
-import '../../data/database/tables.dart';
 import '../../data/models/song_model.dart';
 
 /// 本地音乐扫描状态
@@ -53,18 +50,17 @@ class LocalMusicState {
 }
 
 /// 本地音乐 Notifier
-/// 负责扫描设备上的音频文件，解析元数据，存入 SQLite
-/// 支持 permission_handler + file_picker
+/// 注意：数据库操作已废弃，此类仅保留权限请求和文件选择功能
+/// TODO: 待迁移到 Hive
 class LocalMusicNotifier extends Notifier<LocalMusicState> {
   static const _tag = '[LocalMusicNotifier]';
   static final _logger = logging.Logger(_tag)..level = logging.Level.ALL;
 
-  final _dbHelper = DatabaseHelper.instance;
-
   @override
   LocalMusicState build() {
     _logger.info('[初始化] LocalMusicNotifier 开始初始化');
-    // 初始加载
+    _logger.warning('[警告] 数据库操作已废弃，请使用 Hive');
+    // 初始加载（暂时返回空列表）
     Future.microtask(() => loadAllSongs());
     return const LocalMusicState();
   }
@@ -153,306 +149,141 @@ class LocalMusicNotifier extends Notifier<LocalMusicState> {
     }
   }
 
-  /// 全量扫描本地音乐
+  /// 扫描指定目录中的音频文件
+  Future<int> scanDirectory(String directoryPath) async {
+    _logger.info('[扫描] 开始扫描目录: $directoryPath');
+
+    try {
+      final dir = Directory(directoryPath);
+      if (!await dir.exists()) {
+        _logger.severe('[扫描] 目录不存在: $directoryPath');
+        state = state.copyWith(error: '目录不存在');
+        return 0;
+      }
+
+      state = state.copyWith(isScanning: true, scanProgress: 0, scanTotal: 0, error: null);
+
+      // 支持的音频文件扩展名
+      final audioExtensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'};
+      
+      final songs = <SongModel>[];
+      int scannedCount = 0;
+
+      // 递归扫描目录
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          final ext = path.extension(entity.path).toLowerCase();
+          if (audioExtensions.contains(ext)) {
+            try {
+              // 获取文件信息
+              final stat = await entity.stat();
+              final fileSize = stat.size;
+              
+              // 创建歌曲模型（使用文件名作为标题）
+              final fileName = path.basenameWithoutExtension(entity.path);
+              final song = SongModel(
+                id: const Uuid().v4(),
+                title: fileName,
+                artist: '未知歌手',
+                duration: 0, // TODO: 后续集成 audio_metadata_reader 获取真实时长
+                filePath: entity.path,
+                source: SongSource.local,
+                fileSize: fileSize,
+                mimeType: _getMimeType(ext),
+                createdAt: DateTime.now(),
+              );
+
+              songs.add(song);
+              scannedCount++;
+
+              // 更新进度
+              state = state.copyWith(
+                scanProgress: scannedCount,
+                songs: List.unmodifiable(songs),
+              );
+
+              _logger.fine('[扫描] 找到歌曲: ${song.title}');
+            } catch (e) {
+              _logger.warning('[扫描] 处理文件失败: ${entity.path}, 错误: $e');
+            }
+          }
+        }
+      }
+
+      // 扫描完成
+      state = state.copyWith(
+        isScanning: false,
+        scanTotal: scannedCount,
+        scanProgress: scannedCount,
+        songs: List.unmodifiable(songs),
+      );
+
+      _logger.info('[扫描] 扫描完成，共找到 $scannedCount 首歌曲');
+      return scannedCount;
+    } catch (e, s) {
+      _logger.severe('[扫描] 扫描异常', e, s);
+      state = state.copyWith(
+        isScanning: false,
+        error: '扫描失败: $e',
+      );
+      return 0;
+    }
+  }
+
+  /// 根据文件扩展名获取 MIME 类型
+  String? _getMimeType(String ext) {
+    switch (ext) {
+      case '.mp3':
+        return 'audio/mpeg';
+      case '.wav':
+        return 'audio/wav';
+      case '.flac':
+        return 'audio/flac';
+      case '.aac':
+        return 'audio/aac';
+      case '.ogg':
+        return 'audio/ogg';
+      case '.m4a':
+        return 'audio/mp4';
+      case '.wma':
+        return 'audio/x-ms-wma';
+      default:
+        return null;
+    }
+  }
+
+  /// 全量扫描本地音乐（已废弃 - 数据库操作）
   Future<int> scanAllMusic({
     void Function(int scanned, int total)? onProgress,
   }) async {
-    _logger.info('[扫描] ===== scanAllMusic 开始 =====');
-
-    if (state.isScanning) {
-      _logger.warning('[扫描] 扫描中，禁止重复启动');
-      return 0;
-    }
-
-    try {
-      state = state.copyWith(isScanning: true, scanProgress: 0, scanTotal: 0, error: null);
-
-      // 请求权限
-      _logger.info('[扫描] 检查存储权限...');
-      final hasPermission = await requestPermission();
-
-      String? customDir;
-
-      if (!hasPermission) {
-        // 无权限，让用户选择目录
-        _logger.warning('[扫描] 无存储权限，让用户选择目录');
-        customDir = await pickMusicDirectory();
-
-        if (customDir == null) {
-          _logger.warning('[扫描] 用户取消选择，降级到默认目录扫描');
-          final count = await _scanDefaultDirectories(onProgress: onProgress);
-          state = state.copyWith(isScanning: false);
-          return count;
-        }
-      }
-
-      // 有权限或用户选择了自定义目录
-      int count;
-      if (customDir != null) {
-        _logger.info('[扫描] 自定义目录: $customDir');
-        count = await _scanDirectory(customDir, onProgress: onProgress);
-      } else {
-        // 默认：Android/iOS 使用媒体库扫描，Linux 使用默认目录
-        count = await _scanDefaultDirectories(onProgress: onProgress);
-      }
-
-      _logger.info('[扫描] ===== scanAllMusic 完成，共 $count 首 =====');
-      state = state.copyWith(isScanning: false);
-      return count;
-    } catch (e, s) {
-      _logger.severe('[扫描] scanAllMusic 整体异常', e, s);
-      state = state.copyWith(
-        isScanning: false,
-        error: '扫描失败: ${e.toString()}',
-      );
-      return 0;
-    }
+    _logger.warning('[废弃] scanAllMusic() 已废弃，数据库操作已移除');
+    _logger.warning('[提示] 待迁移到 Hive 后重新实现');
+    state = state.copyWith(error: '扫描功能暂未实现（等待 Hive 迁移）');
+    return 0;
   }
 
-  /// 扫描默认目录（Linux/macOS/Windows）
-  Future<int> _scanDefaultDirectories({
-    void Function(int scanned, int total)? onProgress,
-  }) async {
-    _logger.info('[扫描] ===== _scanDefaultDirectories 开始 =====');
-
-    final home = Platform.environment['HOME'] ?? '/home';
-    final musicDir = '$home/Music';
-    final downloadDir = '$home/Downloads';
-    final dirs = [musicDir, downloadDir];
-
-    _logger.info('[扫描] 扫描目录: $dirs');
-
-    final List<String> audioFiles = [];
-
-    for (final dir in dirs) {
-      try {
-        final directory = Directory(dir);
-        if (await directory.exists()) {
-          _logger.info('[扫描] 目录存在，开始扫描: $dir');
-          int fileCount = 0;
-
-          await for (final entity in directory.list(recursive: true)) {
-            if (entity is File && _isSupportedFormat(entity.path)) {
-              audioFiles.add(entity.path);
-              fileCount++;
-            }
-          }
-
-          _logger.info('[扫描] $dir 扫描完成，找到 $fileCount 个音频文件');
-        } else {
-          _logger.warning('[扫描] 目录不存在或无法访问: $dir');
-        }
-      } catch (e, s) {
-        _logger.severe('[扫描] 扫描目录 $dir 异常', e, s);
-      }
-    }
-
-    _logger.info('[扫描] 默认目录扫描完成，共找到 ${audioFiles.length} 个音频文件');
-
-    // 更新扫描目录
-    state = state.copyWith(scanDirectories: dirs);
-
-    return await _processAudioFiles(audioFiles, onProgress: onProgress);
-  }
-
-  /// 扫描指定目录
-  Future<int> _scanDirectory(
-    String dir, {
-    void Function(int scanned, int total)? onProgress,
-  }) async {
-    _logger.info('[扫描] ===== _scanDirectory: $dir =====');
-
-    final List<String> audioFiles = [];
-
-    try {
-      final directory = Directory(dir);
-      if (await directory.exists()) {
-        await for (final entity in directory.list(recursive: true)) {
-          if (entity is File && _isSupportedFormat(entity.path)) {
-            audioFiles.add(entity.path);
-          }
-        }
-      }
-    } catch (e, s) {
-      _logger.severe('[扫描] 扫描目录 $dir 异常', e, s);
-    }
-
-    _logger.info('[扫描] 扫描完成，共找到 ${audioFiles.length} 个音频文件');
-    state = state.copyWith(scanDirectories: [dir]);
-
-    return await _processAudioFiles(audioFiles, onProgress: onProgress);
-  }
-
-  /// 处理音频文件列表
-  Future<int> _processAudioFiles(
-    List<String> audioFiles, {
-    void Function(int scanned, int total)? onProgress,
-  }) async {
-    int count = 0;
-    final total = audioFiles.length;
-
-    state = state.copyWith(isScanning: true, scanProgress: 0, scanTotal: total);
-
-    for (final filePath in audioFiles) {
-      try {
-        final songModel = SongModel(
-          id: _generateSongId(filePath),
-          title: _extractFileName(filePath),
-          artist: '未知歌手',
-          album: null,
-          duration: 0,
-          coverUrl: null,
-          source: SongSource.local,
-          filePath: filePath,
-          onlineUrl: null,
-          lyrics: null,
-          isFavorite: false,
-          playCount: 0,
-          createdAt: DateTime.now(),
-        );
-
-        await _upsertSong(songModel);
-        count++;
-
-        state = state.copyWith(scanProgress: count);
-        _logger.fine('[扫描] 处理进度: $count / $total');
-        onProgress?.call(count, total);
-      } catch (e, s) {
-        _logger.severe('[扫描] 处理文件 $filePath 失败', e, s);
-        // 单个文件失败不影响整体，继续处理下一个
-      }
-    }
-
-    _logger.info('[扫描] ===== _processAudioFiles 完成，共 $count 首 =====');
-
-    // 重新加载歌曲列表
-    await loadAllSongs();
-
-    state = state.copyWith(isScanning: false);
-    return count;
-  }
-
-  /// 从文件路径提取文件名（不含扩展名）
-  String _extractFileName(String filePath) {
-    try {
-      final name = filePath.split('/').last;
-      final dotIndex = name.lastIndexOf('.');
-      if (dotIndex > 0) return name.substring(0, dotIndex);
-      return name;
-    } catch (e) {
-      _logger.severe('[工具] _extractFileName 异常: $filePath', e);
-      return filePath;
-    }
-  }
-
-  /// 生成歌曲唯一 ID（文件路径的 MD5 哈希）
-  String _generateSongId(String filePath) {
-    try {
-      final bytes = md5.convert(utf8.encode(filePath));
-      return bytes.toString();
-    } catch (e) {
-      _logger.severe('[工具] _generateSongId 异常: $filePath', e);
-      // 回退到使用时间戳
-      return DateTime.now().millisecondsSinceEpoch.toString();
-    }
-  }
-
-  /// 判断是否支持该格式
-  bool _isSupportedFormat(String uri) {
-    try {
-      final lower = uri.toLowerCase();
-      return lower.endsWith('.mp3') ||
-          lower.endsWith('.aac') ||
-          lower.endsWith('.flac') ||
-          lower.endsWith('.wav') ||
-          lower.endsWith('.mp4') ||
-          lower.endsWith('.m4a');
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// 插入或更新歌曲
-  Future<void> _upsertSong(SongModel song) async {
-    try {
-      final db = await _dbHelper.db;
-      await db.insert(
-        Tables.songs,
-        song.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (e, s) {
-      _logger.severe('[数据库] _upsertSong 异常: ${song.title}', e, s);
-    }
-  }
-
-  /// 从数据库加载所有本地歌曲
+  /// 从数据库加载所有本地歌曲（已废弃）
   Future<void> loadAllSongs() async {
-    _logger.info('[数据库] loadAllSongs() 开始');
-
-    try {
-      final db = await _dbHelper.db;
-      final rows = await db.query(
-        Tables.songs,
-        orderBy: 'title ASC',
-      );
-
-      final songs = rows.map((row) => SongModel.fromMap(row)).toList();
-      state = state.copyWith(songs: songs, error: null);
-      _logger.info('[数据库] loadAllSongs 完成，共 ${songs.length} 首');
-    } catch (e, s) {
-      _logger.severe('[数据库] loadAllSongs 异常', e, s);
-      state = state.copyWith(songs: [], error: '加载歌曲失败: $e');
-    }
+    _logger.warning('[废弃] loadAllSongs() 已废弃，数据库操作已移除');
+    _logger.warning('[提示] 待迁移到 Hive 后重新实现');
+    state = state.copyWith(songs: [], error: null);
   }
 
-  /// 搜索歌曲
+  /// 搜索歌曲（已废弃）
   Future<List<SongModel>> searchSongs(String keyword) async {
-    _logger.info('[搜索] searchSongs() keyword=$keyword');
-
-    try {
-      final db = await _dbHelper.db;
-      final rows = await db.query(
-        Tables.songs,
-        where: 'title LIKE ? OR artist LIKE ?',
-        whereArgs: ['%$keyword%', '%$keyword%'],
-        orderBy: 'title ASC',
-      );
-
-      return rows.map((row) => SongModel.fromMap(row)).toList();
-    } catch (e, s) {
-      _logger.severe('[搜索] searchSongs 异常', e, s);
-      return [];
-    }
+    _logger.warning('[废弃] searchSongs() 已废弃，数据库操作已移除');
+    return [];
   }
 
-  /// 删除歌曲
+  /// 删除歌曲（已废弃）
   Future<void> deleteSong(String id) async {
-    _logger.info('[数据库] deleteSong() id=$id');
-
-    try {
-      final db = await _dbHelper.db;
-      await db.delete(Tables.songs, where: 'id = ?', whereArgs: [id]);
-      await loadAllSongs();
-    } catch (e, s) {
-      _logger.severe('[数据库] deleteSong 异常', e, s);
-      state = state.copyWith(error: '删除失败: $e');
-    }
+    _logger.warning('[废弃] deleteSong() 已废弃，数据库操作已移除');
   }
 
-  /// 清除所有歌曲
+  /// 清除所有歌曲（已废弃）
   Future<void> clearAllSongs() async {
-    _logger.info('[数据库] clearAllSongs()');
-
-    try {
-      final db = await _dbHelper.db;
-      await db.delete(Tables.songs);
-      state = state.copyWith(songs: []);
-      _logger.info('[数据库] clearAllSongs 完成');
-    } catch (e, s) {
-      _logger.severe('[数据库] clearAllSongs 异常', e, s);
-      state = state.copyWith(error: '清空失败: $e');
-    }
+    _logger.warning('[废弃] clearAllSongs() 已废弃，数据库操作已移除');
+    state = state.copyWith(songs: []);
   }
 }
 

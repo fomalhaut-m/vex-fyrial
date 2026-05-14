@@ -55,12 +55,57 @@ class _PlaylistTabState extends ConsumerState<PlaylistTab>
     if (notifier.state.isScanning) return;
 
     try {
-      final count = await notifier.scanAllMusic();
+      // 1. 请求存储权限
+      final hasPermission = await notifier.requestPermission();
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('需要存储权限才能扫描音乐'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2. 让用户选择文件夹
+      final directoryPath = await notifier.pickMusicDirectory();
+      if (directoryPath == null || directoryPath.isEmpty) {
+        // 用户取消选择
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已取消选择目录'),
+              backgroundColor: Colors.grey,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 3. 显示选择的目录
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('共扫描到 $count 首歌曲'),
+            content: Text('已选择目录: $directoryPath'),
             duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // TODO: 实现实际的扫描逻辑（等待 Hive 迁移后实现）
+      // final count = await notifier.scanDirectory(directoryPath);
+      
+      // 实际扫描目录
+      final count = await notifier.scanDirectory(directoryPath);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('扫描完成，共找到 $count 首歌曲'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
       }

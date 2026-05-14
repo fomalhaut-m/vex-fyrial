@@ -15,7 +15,7 @@ enum PlayMode {
 }
 
 /// 播放器状态
-class VexfyPlayerState {
+class FyrialPlayerState {
   final List<SongModel> playlist;
   final int currentIndex;
   final SongModel? currentSong;
@@ -27,7 +27,7 @@ class VexfyPlayerState {
   final bool isShuffle;
   final String? error; // 当前错误信息
 
-  const VexfyPlayerState({
+  const FyrialPlayerState({
     this.playlist = const [],
     this.currentIndex = -1,
     this.currentSong,
@@ -40,7 +40,7 @@ class VexfyPlayerState {
     this.error,
   });
 
-  VexfyPlayerState copyWith({
+  FyrialPlayerState copyWith({
     List<SongModel>? playlist,
     int? currentIndex,
     SongModel? currentSong,
@@ -52,7 +52,7 @@ class VexfyPlayerState {
     bool? isShuffle,
     String? error,
   }) {
-    return VexfyPlayerState(
+    return FyrialPlayerState(
       playlist: playlist ?? this.playlist,
       currentIndex: currentIndex ?? this.currentIndex,
       currentSong: currentSong ?? this.currentSong,
@@ -88,7 +88,7 @@ class VexfyPlayerState {
 
 /// 播放器 Notifier - 全局单例
 /// 封装 just_audio，提供播放控制、队列管理、进度监听
-class PlayerNotifier extends Notifier<VexfyPlayerState> {
+class PlayerNotifier extends Notifier<FyrialPlayerState> {
   static final _logger = logging.Logger('PlayerNotifier')..level = logging.Level.ALL;
 
   /// just_audio 的 AudioPlayer 实例
@@ -104,12 +104,12 @@ class PlayerNotifier extends Notifier<VexfyPlayerState> {
   List<int>? _shuffledIndices;
 
   @override
-  VexfyPlayerState build() {
+  FyrialPlayerState build() {
     _initPlayer();
     ref.onDispose(() {
       _dispose();
     });
-    return const VexfyPlayerState();
+    return const FyrialPlayerState();
   }
 
   /// 初始化播放器（带异常兜底）
@@ -663,6 +663,6 @@ class PlayerNotifier extends Notifier<VexfyPlayerState> {
 }
 
 /// PlayerNotifier 的 Provider
-final playerProvider = NotifierProvider<PlayerNotifier, VexfyPlayerState>(() {
+final playerProvider = NotifierProvider<PlayerNotifier, FyrialPlayerState>(() {
   return PlayerNotifier();
 });

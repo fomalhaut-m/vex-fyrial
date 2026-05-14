@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'router/app_router.dart';
 import 'app/core/theme.dart';
 import 'services/audio_handler_service.dart';
 import 'services/health_check_service.dart';
-import 'data/database/database_helper.dart';
 
 /// 全局日志实例
 final _logger = _AppLogger();
@@ -35,9 +35,12 @@ class _AppLogger {
   }
 }
 
-/// Vexfy App 入口文件
+/// Fyrial App 入口文件
 Future<void> main() async {
-  _logger.info('[Vexfy] ===== App 启动 =====');
+  // 启用分层日志记录（必须在创建任何 Logger 之前调用）
+  logging.hierarchicalLoggingEnabled = true;
+
+  _logger.info('[Fyrial] ===== App 启动 =====');
 
   _setupExceptionHandlers();
 
@@ -81,7 +84,8 @@ Future<void> _initServicesWithFallback() async {
   _logger.info('[main] 开始初始化全局服务...');
 
   try {
-    await _initDatabaseWithFallback();
+    // 注意：数据库已废弃，暂不初始化任何数据存储
+    _logger.warning('[main] 数据存储层已废弃，待后续实现');
 
     try {
       await HealthCheckService.instance.runAllChecks();
@@ -101,19 +105,9 @@ Future<void> _initServicesWithFallback() async {
     _printHealthCheckSummary();
 
     _logger.info('[main] 全局服务初始化完成');
-    _logger.info('[Vexfy] ===== App 启动完成 =====');
+    _logger.info('[Fyrial] ===== App 启动完成 =====');
   } catch (e, s) {
     _logger.severe('[main] _initServicesWithFallback() 异常', exception: e, stackTrace: s);
-  }
-}
-
-Future<void> _initDatabaseWithFallback() async {
-  try {
-    final db = await DatabaseHelper.instance.db;
-    _logger.info('[main] 数据库初始化完成: ${db.path}');
-  } catch (e) {
-    _logger.warning('[main] 数据库初始化失败，使用内存模式');
-    DatabaseHelper.instance.setMemoryMode();
   }
 }
 
@@ -125,7 +119,7 @@ class _AppContainer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Vexfy',
+      title: 'Fyrial',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,

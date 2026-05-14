@@ -150,7 +150,7 @@ class PlayerPage extends ConsumerWidget {
   }
 
   /// 进度条 Slider
-  Widget _buildProgressSlider(WidgetRef ref, VexfyPlayerState state) {
+  Widget _buildProgressSlider(WidgetRef ref, FyrialPlayerState state) {
     return SliderTheme(
       data: const SliderThemeData(
         thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
@@ -215,7 +215,7 @@ class PlayerPage extends ConsumerWidget {
   }
 
   /// 控制栏
-  Widget _buildControlBar(WidgetRef ref, VexfyPlayerState state) {
+  Widget _buildControlBar(WidgetRef ref, FyrialPlayerState state) {
     final notifier = ref.read(playerProvider.notifier);
 
     return Padding(

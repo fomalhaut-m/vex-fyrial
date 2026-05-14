@@ -15,7 +15,7 @@ abstract class AppRoutes {
   static const String player = '/player';
 }
 
-/// Vexfy 路由配置（go_router）
+/// Fyrial 路由配置（go_router）
 /// 所有页面在此注册，路由跳转通过 context.go() 实现
 class AppRouter {
   AppRouter._();

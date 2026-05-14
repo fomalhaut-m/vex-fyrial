@@ -11,8 +11,8 @@ import '../providers/player_provider.dart';
 /// 实现后台播放、通知栏控制、锁屏控制
 /// 支持 just_audio_mpv（Linux 桌面）
 /// 所有操作都有完善的日志和异常兜底
-class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
-  static const _tag = '[VexfyAudioHandler]';
+class FyrialAudioHandler extends BaseAudioHandler with SeekHandler {
+  static const _tag = '[FyrialAudioHandler]';
   static final _logger = logging.Logger(_tag)..level = logging.Level.ALL;
 
   /// just_audio player 实例
@@ -30,8 +30,8 @@ class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
   StreamSubscription? _durationSubscription;
   StreamSubscription? _songSubscription;
 
-  VexfyAudioHandler() {
-    _logger.info('[初始化] VexfyAudioHandler 创建');
+  FyrialAudioHandler() {
+    _logger.info('[初始化] FyrialAudioHandler 创建');
   }
 
   /// 关联 PlayerNotifier
@@ -340,26 +340,26 @@ class VexfyAudioHandler extends BaseAudioHandler with SeekHandler {
 }
 
 /// 全局 AudioHandler 实例（单例）
-VexfyAudioHandler? _audioHandler;
+FyrialAudioHandler? _audioHandler;
 
 /// 获取全局 AudioHandler
-VexfyAudioHandler get audioHandler {
-  _audioHandler ??= VexfyAudioHandler();
+FyrialAudioHandler get audioHandler {
+  _audioHandler ??= FyrialAudioHandler();
   return _audioHandler!;
 }
 
 /// 启动音频服务（后台播放）
 /// 失败不影响主流程
-Future<VexfyAudioHandler?> startAudioService() async {
-  final logger = logging.Logger('[Vexfy AudioService]')..level = logging.Level.INFO;
+Future<FyrialAudioHandler?> startAudioService() async {
+  final logger = logging.Logger('[Fyrial AudioService]')..level = logging.Level.INFO;
   logger.info('启动音频服务...');
 
   try {
     final handler = await AudioService.init(
       builder: () => audioHandler,
       config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.vexfy.vexfy.audio',
-        androidNotificationChannelName: 'Vexfy 音乐播放',
+        androidNotificationChannelId: 'top.vex.fyrial.audio',
+        androidNotificationChannelName: 'Fyrial 音乐播放',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
         notificationColor: Color(0xFF1DB954),
@@ -376,6 +376,6 @@ Future<VexfyAudioHandler?> startAudioService() async {
 }
 
 /// 带降级的音频服务启动
-Future<VexfyAudioHandler?> startAudioServiceWithFallback() async {
+Future<FyrialAudioHandler?> startAudioServiceWithFallback() async {
   return await startAudioService();
 }

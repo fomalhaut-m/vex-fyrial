@@ -1,4 +1,4 @@
-# vexfy
+# Fyrial
 
 A new Flutter project.
 

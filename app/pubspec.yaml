@@ -1,7 +1,7 @@
 # 项目名称：应用唯一标识
-name: vexfy
+name: Fyrial
 # 项目描述
-description: Vexfy - 个人音乐播放器，流畅、稳定、低内存
+description: Fyrial - 个人音乐播放器，流畅、稳定、低内存
 # 版本号：主版本.次版本.修订号+构建号
 version: 1.0.0+1
 
@@ -42,12 +42,6 @@ dependencies:
   # 轻量键值存储：音量、主题、播放模式
   # 文档：https://pub.dev/packages/shared_preferences
   shared_preferences: ^2.5.2
-  # SQLite 本地数据库：歌单、收藏、播放历史
-  # 文档：https://pub.dev/packages/sqflite
-  sqflite: ^2.4.1
-  # 跨平台通用数据库FFI（桌面Windows/Linux/macOS必备）
-  # 文档：https://pub.dev/packages/sqflite_common_ffi
-  sqflite_common_ffi: ^2.4.0+3
   # 获取系统存储路径
   # 文档：https://pub.dev/packages/path_provider
   path_provider: ^2.1.5
@@ -69,6 +63,9 @@ dependencies:
   # 网络请求（下载歌词、在线音乐）
   # 文档：https://pub.dev/packages/dio
   dio: ^5.8.0+1
+  # JSON 序列化（自动生成 fromJson/toJson）
+  # 文档：https://pub.dev/packages/json_annotation
+  json_annotation: ^4.9.0
   # 时间格式化、国际化（歌曲时长）
   # 文档：https://pub.dev/packages/intl
   intl: ^0.19.0
@@ -111,6 +108,9 @@ dev_dependencies:
   # 代码自动生成工具
   # 文档：https://pub.dev/packages/build_runner
   build_runner: ^2.4.13
+  # JSON 序列化代码生成器
+  # 文档：https://pub.dev/packages/json_serializable
+  json_serializable: ^6.8.0
   # Riverpod 自动生成代码
   # 文档：https://pub.dev/packages/riverpod_generator
   riverpod_generator: ^2.4.3

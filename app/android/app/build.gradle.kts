@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.vexfy.vexfy"
+    namespace = "top.vex.fyrial"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,12 +16,12 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget ="17"  // 把 1.8 改成 17
     }
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.vexfy.vexfy"
+        applicationId = "top.vex.fyrial"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

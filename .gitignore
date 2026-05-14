@@ -1,91 +1,206 @@
-# Miscellaneous
+# =============================================================================
+# Flutter/Dart 项目 .gitignore 配置
+# 项目: fyrial - 个人音乐播放器
+# =============================================================================
+
+# ==================== 临时文件和系统文件 ====================
 *.class
 *.log
 *.pyc
 *.swp
+*~
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+Thumbs.db
+desktop.ini
 
-# IntelliJ related
+# ==================== IDE 配置 ====================
+# IntelliJ IDEA / Android Studio
+.idea/
 *.iml
 *.ipr
 *.iws
-.idea/
 
-# VS Code (uncomment if you don't want to include vscode config in version control)
-# .vscode/
+# VS Code (保留部分配置文件)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Eclipse
+.classpath
+.project
+.settings/
+
+# ==================== Flutter/Dart/Pub 相关 ====================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+coverage/
 
-# Symbolication related
+# 注意：pubspec.lock 应该被提交到版本控制
+# 其他 lock 文件（如 package-lock.json）应该被忽略
+package-lock.json
+yarn.lock
+
+# API 文档
+**/doc/api/
+
+# iOS Flutter 构建标识
+**/ios/Flutter/.last_build_id
+
+# ==================== 符号化和混淆 ====================
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android related
-/android/app/debug
-/android/app/profile
-/android/app/release
-/android/local.properties
-/android/.gradle/
-/android/gradle/wrapper/gradle-wrapper.jar
-*.keystore
-*.jks
+# ==================== Android 相关 ====================
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/local.properties
+**/android/.gradle/
+**/android/.kotlin/
+**/android/gradle/wrapper/gradle-wrapper.jar
+**/android/**/*.keystore
+**/android/**/*.jks
+**/android/build/
+**/android/**/build/
+**/android/captures/
+**/android/outputs/
 
-# iOS related
-/ios/Flutter/Flutter.framework
-/ios/Flutter/Flutter.podspec
-/ios/Flutter/ephemeral/
-/ios/Pods/
-/ios/Runner.xcworkspace/
-/ios/Runner.xcodeproj/project.xcworkspace/
-/ios/Runner.xcodeproj/xcuserdata/
-/ios/*.xcworkspace/xcuserdata/
-.DS_Store
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
 
-# macOS related
-/macos/Flutter/ephemeral/
-/macos/Pods/
-/macos/Runner.xcworkspace/
-/macos/Runner.xcodeproj/project.xcworkspace/
-/macos/Runner.xcodeproj/xcuserdata/
-/macos/*.xcworkspace/xcuserdata/
+# ==================== iOS 相关 ====================
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/ephemeral/
+**/ios/Pods/
+**/ios/Runner.xcworkspace/xcuserdata/
+**/ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+**/ios/Runner.xcodeproj/xcuserdata/
+**/ios/*.xcworkspace/xcuserdata/
+**/ios/build/
+**/ios/**/*.pbxuser
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.perspectivev3
+**/ios/**/*.xcuserstate
+**/ios/DerivedData/
 
-# Linux/Windows related
-**/build/
-**/cmake/
-**/CMakeLists.txt.user
+# CocoaPods
+**/ios/Podfile.lock
 
-# Local environment files
+# ==================== macOS 相关 ====================
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+**/macos/Runner.xcworkspace/xcuserdata/
+**/macos/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+**/macos/Runner.xcodeproj/xcuserdata/
+**/macos/*.xcworkspace/xcuserdata/
+**/macos/build/
+**/macos/**/*.pbxuser
+**/macos/**/*.mode1v3
+**/macos/**/*.mode2v3
+**/macos/**/*.perspectivev3
+**/macos/**/*.xcuserstate
+**/macos/DerivedData/
+
+# ==================== Linux 相关 ====================
+**/linux/flutter/ephemeral/
+**/linux/build/
+**/linux/CMakeLists.txt.user
+
+# ==================== Windows 相关 ====================
+**/windows/flutter/ephemeral/
+**/windows/build/
+**/windows/CMakeLists.txt.user
+
+# ==================== Web 相关 ====================
+**/web/manifest.json.bak
+
+# ==================== 环境配置文件 ====================
 .env
 .env.local
 .env.development
 .env.production
+*.env
 
-# Temporary files
-*.tmp
-*.temp
-*.pid
-*.lock
+# ==================== 测试覆盖率 ====================
+*.lcov
+*.info
 
-# Archive files
+# ==================== 归档和发布文件 ====================
 *.zip
 *.tar.gz
 *.rar
 *.7z
+*.apk
+*.aab
+*.ipa
+*.app
+*.dSYM
+
+# ==================== 密钥和证书 ====================
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+
+# ==================== 数据库文件 ====================
+*.db
+*.sqlite
+*.sqlite3
+
+# ==================== 缓存和临时目录 ====================
+.cache/
+.temp/
+tmp/
+temp/
+*.tmp
+*.temp
+*.pid
+*.seed
+
+# ==================== 版本控制系统 ====================
+.svn/
+.hg/
+
+# ==================== 包管理器 ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ==================== 其他 ====================
+.atom/
+.build/
+.buildlog/
+.history
+.swiftpm/
+migrate_working_dir/
+
+# ==================== 文档生成 ====================
+**/generated/
+**/*.g.dart
+**/*.freezed.dart
+
+# ==================== 性能分析 ====================
+*.profiler
+*.trace
+
+# ==================== 截图和资源 ====================
+screenshots/
+exports/

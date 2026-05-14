@@ -1,8 +1,22 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'song_model.g.dart';
+
 /// 歌曲来源枚举
-/// [local] 本地音乐，[online] 在线音乐
-enum SongSource { local, online }
+enum SongSource {
+  local,
+  online;
+
+  String toJson() => name;
+  
+  static SongSource fromJson(String value) => SongSource.values.firstWhere(
+    (e) => e.name == value,
+    orElse: () => SongSource.local,
+  );
+}
 
 /// 歌曲模型 - 核心实体，通用本地和在线歌曲
+@JsonSerializable()
 class SongModel {
   final String id;
   final String title;
@@ -49,84 +63,4 @@ class SongModel {
   /// 是否是本地歌曲
   bool get isLocal => source == SongSource.local;
 
-  /// 复制并修改某些字段
-  SongModel copyWith({
-    String? id,
-    String? title,
-    String? artist,
-    String? album,
-    int? duration,
-    String? coverUrl,
-    SongSource? source,
-    String? filePath,
-    String? onlineUrl,
-    String? lyrics,
-    bool? isFavorite,
-    int? playCount,
-    int? fileSize,
-    String? mimeType,
-    DateTime? createdAt,
-  }) {
-    return SongModel(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      artist: artist ?? this.artist,
-      album: album ?? this.album,
-      duration: duration ?? this.duration,
-      coverUrl: coverUrl ?? this.coverUrl,
-      source: source ?? this.source,
-      filePath: filePath ?? this.filePath,
-      onlineUrl: onlineUrl ?? this.onlineUrl,
-      lyrics: lyrics ?? this.lyrics,
-      isFavorite: isFavorite ?? this.isFavorite,
-      playCount: playCount ?? this.playCount,
-      fileSize: fileSize ?? this.fileSize,
-      mimeType: mimeType ?? this.mimeType,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
-
-  /// 从 Map（数据库行）构造
-  factory SongModel.fromMap(Map<String, dynamic> map) {
-    return SongModel(
-      id: map['id'] as String,
-      title: map['title'] as String,
-      artist: map['artist'] as String? ?? '',
-      album: map['album'] as String?,
-      duration: map['duration'] as int? ?? 0,
-      coverUrl: map['cover_url'] as String?,
-      source: map['source'] == 'online' ? SongSource.online : SongSource.local,
-      filePath: map['file_path'] as String?,
-      onlineUrl: map['online_url'] as String?,
-      lyrics: map['lyrics'] as String?,
-      isFavorite: (map['is_favorite'] as int? ?? 0) == 1,
-      playCount: map['play_count'] as int? ?? 0,
-      fileSize: map['file_size'] as int?,
-      mimeType: map['mime_type'] as String?,
-      createdAt: map['created_at'] != null
-          ? DateTime.tryParse(map['created_at'] as String)
-          : null,
-    );
-  }
-
-  /// 转为 Map（存入数据库）
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'artist': artist,
-      'album': album,
-      'duration': duration,
-      'cover_url': coverUrl,
-      'source': source == SongSource.online ? 'online' : 'local',
-      'file_path': filePath,
-      'online_url': onlineUrl,
-      'lyrics': lyrics,
-      'is_favorite': isFavorite ? 1 : 0,
-      'play_count': playCount,
-      'file_size': fileSize,
-      'mime_type': mimeType,
-      'created_at': createdAt?.toIso8601String(),
-    };
-  }
 }

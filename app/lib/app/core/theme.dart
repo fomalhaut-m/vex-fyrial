@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Vexfy 主题配置
+/// fyrial 主题配置
 /// 主题色：绿色（#1DB954），与 PRD v3 保持一致
 class AppTheme {
   AppTheme._();
 
-  // Vexfy 主题绿色
+  // Fyrial 主题绿色
   static const Color primaryGreen = Color(0xFF1DB954);
   static const Color primaryGreenLight = Color(0xFF1ed760);
   static const Color primaryGreenDark = Color(0xFF168a41);
